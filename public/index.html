@@ -409,6 +409,15 @@ function renderApplicationStatus(application, leaders) {
   } else if (application.status === "declined") {
     const availableLeaders = leaders.map(l => typeof l === "string" ? { id: "", name: l } : l);
     const existingDiscussion = application.discussion;
+    if (existingDiscussion?.summary) {
+      box.innerHTML = '<div style="border:1px solid #9b4242; padding:0.8rem; border-radius:6px;">' +
+        '<p style="color:#ff9b9b;"><strong>Application Status: Declined</strong></p>' +
+        '<p style="margin-top:0.6rem;"><strong>Your submitted discussion summary</strong></p>' +
+        '<p style="white-space:pre-wrap;margin-top:0.4rem;">' + escapeHtml(existingDiscussion.summary) + '</p>' +
+        '<p style="margin-top:0.5rem;"><strong>Leader spoken with:</strong> ' + escapeHtml(existingDiscussion.leader_name || "") + '</p>' +
+        '<p style="margin-top:0.5rem;color:var(--muted);">Submitted. Awaiting leader review.</p></div>';
+      return;
+    }
     box.innerHTML = '<div style="border:1px solid #9b4242; padding:0.8rem; border-radius:6px;">' +
       '<p style="color:#ff9b9b;"><strong>Application Status: Declined</strong></p>' +
       '<p style="margin:0.5rem 0;">Summarize your conversation with a recruitment leader and select who you spoke with.</p>' +
@@ -442,7 +451,6 @@ function renderApplicationStatus(application, leaders) {
     });
     refreshSelection();
     const message = document.getElementById("discussion-status");
-    if (existingDiscussion) message.textContent = "Summary submitted. You may update it while the application remains declined.";
     document.getElementById("submit-discussion").onclick = async () => {
       const summary = document.getElementById("discussion-summary").value.trim();
       if (!summary) { message.textContent = "Enter a summary first."; return; }
@@ -457,7 +465,7 @@ function renderApplicationStatus(application, leaders) {
         const result = await response.json();
         if (!response.ok) throw new Error(result.error || "Submission failed");
         application.discussion = result.discussion;
-        message.textContent = "Summary submitted successfully. A leader can now return your application to pending review.";
+        renderApplicationStatus(application, leaders);
       } catch (error) { message.textContent = "Could not submit: " + error.message; }
     };
   } else {
