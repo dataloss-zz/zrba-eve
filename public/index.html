@@ -510,6 +510,16 @@ function renderApplicationStatus(application, leaders) {
   }
 }
 
+function formatReviewTimestamp(value) {
+  if (!value) return "—";
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "—";
+  return new Intl.DateTimeFormat("en-US", {
+    month: "2-digit", day: "2-digit", year: "2-digit",
+    hour: "2-digit", minute: "2-digit", hourCycle: "h23"
+  }).format(date).replace(",", "");
+}
+
 function escapeHtml(value) {
   return String(value).replace(/[&<>"\']/g, ch => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"' : "&quot;", "\'": "&#39;" }[ch]));
 }
@@ -623,7 +633,7 @@ async function showProfile(a, scroll = true) {
       <p>Birthday: ${a.birthday ? String(a.birthday).slice(0,10) : "—"}</p>
       <p>Submitted: ${a.submitted_at || "—"}</p>
       ${declined ? `<details style="margin:0.8rem 0;border:1px solid var(--border);border-radius:6px;padding:0.7rem;"><summary style="cursor:pointer;font-weight:600;">Applicant discussion summary ${a.discussion ? "— submitted" : "— awaiting submission"}</summary><div style="margin-top:0.6rem;">${a.discussion ? `<p><strong>Leader selected:</strong> ${escapeHtml(a.discussion.leader_name || "")}</p><p style="white-space:pre-wrap;">${escapeHtml(a.discussion.summary || "")}</p><p><strong>Submitted:</strong> ${escapeHtml(a.discussion.updated_at || "—")}</p>` : "<p>No discussion summary submitted yet.</p>"}</div></details>` : (a.discussion ? `<p><strong>Applicant discussion with ${escapeHtml(a.discussion.leader_name || "")}:</strong> ${escapeHtml(a.discussion.summary || "")}</p>` : "")}
-      ${a.review_history?.length ? `<p><strong>Review history:</strong> ${a.review_history.map(r => escapeHtml(r.leader_name || r.leader_id) + " — " + escapeHtml(r.reviewed_at)).join("; ")}</p>` : ""}
+      ${a.review_history?.length ? `<details style="margin:0.8rem 0;border:1px solid var(--border);border-radius:6px;padding:0.7rem;"><summary style="cursor:pointer;font-weight:600;">Review history (${a.review_history.length})</summary><ul style="margin:0.6rem 0 0;padding-left:1.3rem;">${a.review_history.map(r => `<li>${escapeHtml(r.leader_name || r.leader_id)} — ${escapeHtml(formatReviewTimestamp(r.reviewed_at))}</li>`).join("")}</ul></details>` : ""}
       <p>Recent killmails: ${a.killmail_count != null ? a.killmail_count : "—"}</p>
       <p>Contacts: ${a.contact_count != null ? a.contact_count : "—"}</p>
       <p>Medals: ${a.medal_count != null ? a.medal_count : "—"}</p>
