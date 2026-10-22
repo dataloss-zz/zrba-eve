@@ -23,7 +23,7 @@ function charIdFromToken(token) {
 }
 
 function tokenFrom(request) {
-  return (request.headers.get("Authorization") || "").replace(/^Bearer\\s+/i, "");
+  return (request.headers.get("Authorization") || "").replace(/^Bearer\s+/i, "");
 }
 
 async function exchangeToken(data) {
