@@ -95,6 +95,36 @@ footer {
 }
 #esi-status { margin-top: 1rem; font-size: 0.9rem; color: var(--muted); }
 #hover-info-bar { position: fixed; left: 0; bottom: 0; z-index: 1000; max-width: min(90vw, 900px); padding: 0.25rem 0.6rem; background: rgba(8,10,15,0.96); color: #c9d0dc; border: 1px solid var(--border); border-left: 0; border-bottom: 0; border-radius: 0 5px 0 0; font: 12px/1.4 ui-monospace, SFMono-Regular, Consolas, monospace; overflow-wrap: anywhere; display: none; }
+#leader-panel {
+  position: fixed;
+  top: 100px;
+  left: 12px;
+  width: 290px;
+  max-height: calc(100vh - 115px);
+  overflow-y: auto;
+  z-index: 9;
+  box-shadow: 0 8px 28px rgba(0,0,0,0.35);
+}
+body.profile-visible .hero,
+body.profile-visible section,
+body.profile-visible footer {
+  margin-left: 314px;
+}
+@media (max-width: 900px) {
+  #leader-panel {
+    position: relative;
+    top: auto;
+    left: auto;
+    width: auto;
+    max-height: none;
+    margin: 1rem;
+  }
+  body.profile-visible .hero,
+  body.profile-visible section,
+  body.profile-visible footer {
+    margin-left: auto;
+  }
+}
 </style>
 </head>
 <body>
@@ -113,6 +143,12 @@ footer {
     <a href="#" id="logout-link" style="display:none;">Logout</a>
   </nav>
 </header>
+
+<aside class="card" id="leader-panel" aria-label="Your character profile" style="display:none;">
+  <h4>Your Character Profile</h4>
+  <div id="application-decision-status" style="margin-bottom:1rem;"></div>
+  <div id="applicant-info"></div>
+</aside>
 
 <div class="hero">
   <h2>Zeta Reticuli Blackpill Alliance</h2>
@@ -182,11 +218,7 @@ footer {
     <button class="btn" id="apply-btn" style="margin-top:1rem;">Login with EVE</button>
     <div id="apply-status" style="margin-top:1rem; color:var(--muted); font-size:0.95rem;"></div>
   </div>
-  <div class="card" id="leader-panel" style="margin-top:1rem; display:none;">
-    <h4>Your submitted profile</h4>
-    <div id="application-decision-status" style="margin-bottom:1rem;"></div>
-    <div id="applicant-info"></div>
-  </div>
+
 </section>
 
 <section id="leaders" style="display:none;">
@@ -388,6 +420,7 @@ async function loadApplicant(token, { submitApplication = true } = {}) {
   const medalCount = Array.isArray(medals) ? medals.length : "—";
   const panel = document.getElementById("leader-panel");
   panel.style.display = "block";
+  document.body.classList.add("profile-visible");
   document.getElementById("applicant-info").innerHTML = `
     <img src="${portrait.px128x128 || portrait.px64x64 || ""}" alt="portrait" style="border-radius:6px; margin-bottom:0.6rem;">
     <p><strong>${char.name}</strong> (ID ${charId})</p>
