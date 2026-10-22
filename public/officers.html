@@ -274,7 +274,7 @@ body.officer-page.session-booting #leaders, body.officer-page.session-booting #c
 <footer>
   Zeta Reticuli Blackpill Alliance — EVE Online Corporation &nbsp;|&nbsp; Powered by ESI &nbsp;|&nbsp; Not affiliated with CCP Games
 </footer>
-<a class="site-admin-link" href="/info.html">Site.Admin</a>
+<a class="site-admin-link" href="/info.html" style="display:none;">Site.Admin</a>
 
 <script>
 const CLIENT_ID = "f6080d22aeda4a90a3f20c5906d83037";
@@ -864,6 +864,13 @@ async function afterLogin(token, opts = {}) {
   currentToken = token;
   sessionStorage.setItem("access_token", token);
   setLoggedIn(true);
+  try {
+    const accessResponse = await fetch("/site-admin-access", { headers: { Authorization: "Bearer " + token } });
+    const access = accessResponse.ok ? await accessResponse.json() : {};
+    const adminLink = document.querySelector(".site-admin-link");
+    if (adminLink) adminLink.style.display = access.allowed ? "inline-block" : "none";
+  } catch {}
+
   const meRes = await fetch("/me", { headers: { Authorization: "Bearer " + token } });
   const me = await meRes.json();
   if (me.is_leader) {
