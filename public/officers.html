@@ -143,6 +143,8 @@ body.officer-page #corp-officers { padding-bottom: 3rem; }
 body.officer-page #leaders, body.officer-page #corp-officers { display: block !important; }
 body.officer-page.session-booting #leaders, body.officer-page.session-booting #corp-officers { visibility: hidden; }
 
+#esi { display: none !important; }
+.site-admin-link { position: fixed; right: 14px; bottom: 10px; z-index: 1001; font-size: 0.8rem; color: var(--muted); background: var(--bg); border: 1px solid var(--border); border-radius: 5px; padding: 0.25rem 0.55rem; }
 </style>
 </head>
 <body class="session-booting officer-page">
@@ -155,7 +157,7 @@ body.officer-page.session-booting #leaders, body.officer-page.session-booting #c
   <nav>
     <a href="/#mission">Mission</a>
     <a href="/#comms">Communications</a>
-    <a href="/#esi">ESI / API</a>
+    <a href="/info.html">ESI / API</a>
     <a href="/#join">Join</a>
     <a href="/officers.html" id="corp-officers-link" style="display:none;">Corp Officers</a>
     <a href="#" id="logout-link" style="display:none;">Logout</a>
@@ -273,6 +275,7 @@ body.officer-page.session-booting #leaders, body.officer-page.session-booting #c
 <footer>
   Zeta Reticuli Blackpill Alliance — EVE Online Corporation &nbsp;|&nbsp; Powered by ESI &nbsp;|&nbsp; Not affiliated with CCP Games
 </footer>
+<a class="site-admin-link" href="/info.html">Site.Admin</a>
 
 <script>
 const CLIENT_ID = "f6080d22aeda4a90a3f20c5906d83037";
