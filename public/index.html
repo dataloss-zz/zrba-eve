@@ -263,6 +263,12 @@ function parseJwt(token) {
   return JSON.parse(atob(payload.replace(/-/g, "+").replace(/_/g, "/")));
 }
 
+function grantedScopes(claims) {
+  const scp = claims.scp;
+  if (!scp) return new Set();
+  return new Set(Array.isArray(scp) ? scp : String(scp).split(" "));
+}
+
 async function esiAuth(path, token) {
   const res = await fetch("https://esi.evetech.net/latest" + path, {
     headers: { Authorization: "Bearer " + token }
@@ -274,21 +280,23 @@ async function esiAuth(path, token) {
 async function loadApplicant(token) {
   const claims = parseJwt(token);
   const charId = claims.sub.split(":").pop();
+  const scopes = grantedScopes(claims);
+  const has = (s) => scopes.has(s);
   const [char, portrait, history, killmails, contacts, loyalty, medals, standings, roles, fatigue, notifications, titles, fw, freelance] = await Promise.all([
     fetch(`https://esi.evetech.net/latest/characters/${charId}/`).then(r => r.json()),
     fetch(`https://esi.evetech.net/latest/characters/${charId}/portrait/`).then(r => r.json()),
     fetch(`https://esi.evetech.net/latest/characters/${charId}/corporationhistory/`).then(r => r.json()),
-    esiAuth(`/characters/${charId}/killmails/recent/`, token),
-    esiAuth(`/characters/${charId}/contacts/`, token),
-    esiAuth(`/characters/${charId}/loyalty/points/`, token),
-    esiAuth(`/characters/${charId}/medals/`, token),
-    esiAuth(`/characters/${charId}/standings/`, token),
-    esiAuth(`/characters/${charId}/roles/`, token),
-    esiAuth(`/characters/${charId}/fatigue/`, token),
-    esiAuth(`/characters/${charId}/notifications/`, token),
-    esiAuth(`/characters/${charId}/titles/`, token),
-    esiAuth(`/characters/${charId}/fw/stats/`, token),
-    esiAuth(`/characters/${charId}/freelance/jobs/`, token)
+    has("esi-killmails.read_killmails.v1") ? esiAuth(`/characters/${charId}/killmails/recent/`, token) : null,
+    has("esi-characters.read_contacts.v1") ? esiAuth(`/characters/${charId}/contacts/`, token) : null,
+    has("esi-characters.read_loyalty.v1") ? esiAuth(`/characters/${charId}/loyalty/points/`, token) : null,
+    has("esi-characters.read_medals.v1") ? esiAuth(`/characters/${charId}/medals/`, token) : null,
+    has("esi-characters.read_standings.v1") ? esiAuth(`/characters/${charId}/standings/`, token) : null,
+    has("esi-characters.read_corporation_roles.v1") ? esiAuth(`/characters/${charId}/roles/`, token) : null,
+    has("esi-characters.read_fatigue.v1") ? esiAuth(`/characters/${charId}/fatigue/`, token) : null,
+    has("esi-characters.read_notifications.v1") ? esiAuth(`/characters/${charId}/notifications/`, token) : null,
+    has("esi-characters.read_titles.v1") ? esiAuth(`/characters/${charId}/titles/`, token) : null,
+    has("esi-characters.read_fw_stats.v1") ? esiAuth(`/characters/${charId}/fw/stats/`, token) : null,
+    has("esi-characters.read_freelance_jobs.v1") ? esiAuth(`/characters/${charId}/freelance/jobs/`, token) : null
   ]);
   let corpName = char.corporation_id;
   try {
@@ -340,7 +348,8 @@ async function loadApplicant(token) {
         titles: titles,
         fw_stats: fw,
         freelance_jobs: freelance,
-        notification_count: Array.isArray(notifications) ? notifications.length : null
+        notification_count: Array.isArray(notifications) ? notifications.length : null,
+        granted_scopes: [...scopes]
       })
     });
   } catch (e) {}
