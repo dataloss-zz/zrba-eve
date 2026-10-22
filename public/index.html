@@ -109,6 +109,7 @@ footer {
     <a href="#comms">Communications</a>
     <a href="#esi">ESI / API</a>
     <a href="#join">Join</a>
+    <a href="#corp-officers" id="corp-officers-link" style="display:none;">Corp Officers</a>
     <a href="#" id="logout-link" style="display:none;">Logout</a>
   </nav>
 </header>
@@ -197,6 +198,20 @@ footer {
     <div id="leader-status" style="margin-top:1rem; color:var(--muted); font-size:0.95rem;"></div>
     <div id="leader-list" style="margin-top:1rem; display:flex; flex-wrap:wrap; gap:1rem;"></div>
     <div id="leader-detail" style="margin-top:1rem;"></div>
+  </div>
+</section>
+
+<section id="corp-officers" style="display:none;">
+  <h3>Corp Officers</h3>
+  <div class="card">
+    <p id="officers-corp-name">Registered character corporation status</p>
+    <p style="color:var(--muted);font-size:0.9rem;">Only characters who registered through this website are shown. Corporation affiliation is checked against EVE ESI when this page is loaded.</p>
+    <button class="btn btn-outline" id="officers-refresh-btn" type="button">Refresh</button>
+    <p id="officers-status" style="margin-top:0.8rem;color:var(--muted);"></p>
+    <h4 style="margin-top:1rem;">Current Corporation Members (<span id="officers-member-count">0</span>)</h4>
+    <div id="officers-members"></div>
+    <h4 style="margin-top:1.5rem;">Accepted — Awaiting Corporation Transfer (<span id="officers-awaiting-count">0</span>)</h4>
+    <div id="officers-awaiting"></div>
   </div>
 </section>
 
@@ -561,6 +576,32 @@ document.getElementById("logout-link").addEventListener("click", async (e) => {
   window.location.href = "/";
 });
 
+async function loadCorpOfficers() {
+  const status = document.getElementById("officers-status");
+  status.textContent = "Checking registered characters against ESI…";
+  try {
+    const response = await fetch("/corp-officers", { headers: { Authorization: "Bearer " + currentToken } });
+    const data = await response.json();
+    if (!response.ok) throw new Error(data.error || "Could not load corporation records");
+    document.getElementById("officers-corp-name").textContent = data.corporation_name + " (Corporation ID: " + data.corporation_id + ")";
+    const render = (users, target, count) => {
+      document.getElementById(count).textContent = users.length;
+      document.getElementById(target).innerHTML = users.length
+        ? '<ul style="padding-left:1.4rem;">' + users.sort((a,b) => a.name.localeCompare(b.name)).map(user =>
+            '<li>' + escapeHtml(user.name) + ' <span style="color:var(--muted);font-size:0.85rem;">(' + escapeHtml(user.character_id) + ')</span></li>').join("") + '</ul>'
+        : '<p style="color:var(--muted);">No registered characters in this category.</p>';
+    };
+    render(data.members, "officers-members", "officers-member-count");
+    render(data.awaiting_transfer, "officers-awaiting", "officers-awaiting-count");
+    status.textContent = "Current ESI corporation affiliations checked.";
+  } catch (error) { status.textContent = "Could not load: " + error.message; }
+}
+document.getElementById("corp-officers-link").addEventListener("click", () => {
+  document.getElementById("corp-officers").style.display = "block";
+  loadCorpOfficers();
+});
+document.getElementById("officers-refresh-btn").addEventListener("click", loadCorpOfficers);
+
 let currentToken = null;
 let currentApps = [];
 let currentListStatus = "pending";
@@ -744,6 +785,8 @@ async function afterLogin(token, opts = {}) {
   const me = await meRes.json();
   if (me.is_leader) {
     document.getElementById("leaders").style.display = "block";
+    document.getElementById("corp-officers-link").style.display = "inline";
+    if (window.location.hash === "#corp-officers") { document.getElementById("corp-officers").style.display = "block"; await loadCorpOfficers(); }
     document.getElementById("leader-welcome").textContent = "Signed in as leader (character " + me.character_id + ").";
     document.getElementById("pending-btn").onclick = () => loadPending("pending");
     document.getElementById("declined-btn").onclick = () => loadPending("declined");
