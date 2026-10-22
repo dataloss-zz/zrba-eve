@@ -108,7 +108,6 @@ footer {
     <a href="#comms">Communications</a>
     <a href="#esi">ESI / API</a>
     <a href="#join">Join</a>
-    <a href="#leaders">Leaders</a>
   </nav>
 </header>
 
@@ -176,9 +175,8 @@ footer {
 <section id="join">
   <h3>Apply to Zeta Reticuli Blackpill Alliance</h3>
   <div class="card">
-    <p>Applicants must log in with their EVE character. Corporation leaders receive the character’s public ESI data for a background check (name, corporation history, portrait, security status, and recent activity).</p>
-    <p style="margin-top:0.8rem;">No password is stored. Authentication is handled by EVE Single Sign-On.</p>
-    <button class="btn" id="apply-btn" style="margin-top:1rem;">Login with EVE &amp; Apply</button>
+    <p>Log in with your EVE character. Leaders are detected automatically after login.</p>
+    <button class="btn" id="apply-btn" style="margin-top:1rem;">Login with EVE</button>
     <div id="apply-status" style="margin-top:1rem; color:var(--muted); font-size:0.95rem;"></div>
   </div>
   <div class="card" id="leader-panel" style="margin-top:1rem; display:none;">
@@ -187,13 +185,14 @@ footer {
   </div>
 </section>
 
-<section id="leaders">
+<section id="leaders" style="display:none;">
   <h3>Leader Review</h3>
   <div class="card">
-    <p>Leaders log in with their EVE character to review submitted applications. Only character IDs listed in the Worker can access this.</p>
-    <button class="btn" id="leader-btn" style="margin-top:1rem;">Leader Login</button>
+    <p id="leader-welcome">You are signed in as a leader.</p>
+    <button class="btn" id="pending-btn" style="margin-top:1rem;">Pending Applications</button>
     <div id="leader-status" style="margin-top:1rem; color:var(--muted); font-size:0.95rem;"></div>
-    <div id="leader-list" style="margin-top:1rem;"></div>
+    <div id="leader-list" style="margin-top:1rem; display:flex; flex-wrap:wrap; gap:1rem;"></div>
+    <div id="leader-detail" style="margin-top:1rem;"></div>
   </div>
 </section>
 
@@ -224,8 +223,7 @@ async function startLogin() {
   const verifier = randomString(64);
   const challenge = base64url(await sha256(verifier));
   sessionStorage.setItem("pkce_verifier", verifier);
-  const state = sessionStorage.getItem("login_mode") || "apply";
-  const url = `https://login.eveonline.com/v2/oauth/authorize?response_type=code&redirect_uri=${encodeURIComponent(REDIRECT_URI)}&client_id=${CLIENT_ID}&scope=${encodeURIComponent(SCOPES)}&code_challenge=${challenge}&code_challenge_method=S256&state=${state}`;
+  const url = `https://login.eveonline.com/v2/oauth/authorize?response_type=code&redirect_uri=${encodeURIComponent(REDIRECT_URI)}&client_id=${CLIENT_ID}&scope=${encodeURIComponent(SCOPES)}&code_challenge=${challenge}&code_challenge_method=S256&state=login`;
   window.location.href = url;
 }
 
@@ -294,41 +292,65 @@ async function loadApplicant(token) {
   } catch (e) {}
 }
 
-document.getElementById("apply-btn").addEventListener("click", () => {
-  sessionStorage.setItem("login_mode", "apply");
-  startLogin();
-});
-document.getElementById("sso-btn").addEventListener("click", () => {
-  sessionStorage.setItem("login_mode", "apply");
-  startLogin();
-});
-document.getElementById("leader-btn").addEventListener("click", () => {
-  sessionStorage.setItem("login_mode", "leader");
-  startLogin();
-});
+document.getElementById("apply-btn").addEventListener("click", startLogin);
+document.getElementById("sso-btn").addEventListener("click", startLogin);
 
-async function loadLeaderApps(token) {
+let currentToken = null;
+let currentApps = [];
+
+function showProfile(a) {
+  const detail = document.getElementById("leader-detail");
+  detail.innerHTML = `
+    <div class="card">
+      <img src="${a.portrait || ""}" alt="" style="border-radius:6px; width:96px; height:96px;">
+      <h4 style="margin-top:0.6rem;">${a.name}</h4>
+      <p>Character ID: ${a.character_id}</p>
+      <p>Corporation: ${a.corporation || a.corporation_id}</p>
+      <p>Security: ${a.security_status != null ? Number(a.security_status).toFixed(2) : "—"}</p>
+      <p>Birthday: ${a.birthday ? String(a.birthday).slice(0,10) : "—"}</p>
+      <p>Submitted: ${a.submitted_at || "—"}</p>
+      <p style="margin-top:0.6rem;"><strong>Corporation history</strong></p>
+      <ul>${(a.history || []).slice(0, 12).map(h => `<li>Corp ${h.corporation_id} — ${h.start_date ? h.start_date.slice(0,10) : "?"}</li>`).join("") || "<li>None</li>"}</ul>
+    </div>
+  `;
+  detail.scrollIntoView({ behavior: "smooth" });
+}
+
+async function loadPending() {
   const res = await fetch("/applications", {
-    headers: { Authorization: "Bearer " + token }
+    headers: { Authorization: "Bearer " + currentToken }
   });
   const status = document.getElementById("leader-status");
   const list = document.getElementById("leader-list");
   if (!res.ok) {
-    status.textContent = "Access denied. Your character is not in the leader list.";
+    status.textContent = "Could not load applications.";
     return;
   }
-  const apps = await res.json();
-  status.textContent = apps.length + " application(s).";
-  list.innerHTML = apps.map(a => `
-    <div class="card" style="margin-top:0.8rem;">
-      <img src="${a.portrait || ""}" alt="" style="border-radius:6px; width:64px; height:64px;">
-      <p><strong>${a.name}</strong> (ID ${a.character_id})</p>
-      <p>Corporation: ${a.corporation || a.corporation_id}</p>
-      <p>Security: ${a.security_status != null ? Number(a.security_status).toFixed(2) : "—"}</p>
-      <p>Submitted: ${a.submitted_at || "—"}</p>
-      <ul>${(a.history || []).slice(0, 6).map(h => `<li>Corp ${h.corporation_id} — ${h.start_date ? h.start_date.slice(0,10) : "?"}</li>`).join("")}</ul>
-    </div>
+  currentApps = await res.json();
+  status.textContent = currentApps.length + " pending application(s). Click a portrait to review.";
+  list.innerHTML = currentApps.map((a, i) => `
+    <button data-i="${i}" style="background:transparent; border:1px solid var(--border); border-radius:8px; padding:0.5rem; cursor:pointer; color:inherit; text-align:center;">
+      <img src="${a.portrait || ""}" alt="${a.name}" style="width:72px; height:72px; border-radius:6px; display:block;">
+      <span style="font-size:0.8rem; display:block; margin-top:0.3rem;">${a.name}</span>
+    </button>
   `).join("") || "<p>No applications yet.</p>";
+  list.querySelectorAll("button[data-i]").forEach(btn => {
+    btn.addEventListener("click", () => showProfile(currentApps[Number(btn.dataset.i)]));
+  });
+}
+
+async function afterLogin(token) {
+  currentToken = token;
+  const meRes = await fetch("/me", { headers: { Authorization: "Bearer " + token } });
+  const me = await meRes.json();
+  if (me.is_leader) {
+    document.getElementById("leaders").style.display = "block";
+    document.getElementById("leader-welcome").textContent = "Signed in as leader (character " + me.character_id + ").";
+    document.getElementById("pending-btn").onclick = loadPending;
+    document.getElementById("apply-status").textContent = "Leader access granted.";
+  } else {
+    await loadApplicant(token);
+  }
 }
 
 document.getElementById("public-btn").addEventListener("click", async () => {
@@ -350,13 +372,7 @@ document.getElementById("public-btn").addEventListener("click", async () => {
     document.getElementById("apply-status").textContent = "Authenticating…";
     try {
       const tokens = await exchangeCode(code);
-      const mode = params.get("state") || sessionStorage.getItem("login_mode") || "apply";
-      if (mode === "leader") {
-        document.getElementById("leader-status").textContent = "Checking access…";
-        await loadLeaderApps(tokens.access_token);
-      } else {
-        await loadApplicant(tokens.access_token);
-      }
+      await afterLogin(tokens.access_token);
       history.replaceState({}, "", REDIRECT_URI);
     } catch (err) {
       document.getElementById("apply-status").textContent = "Login failed: " + err.message + ". Check that the Callback URL in your ESI app matches this page exactly.";
