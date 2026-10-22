@@ -627,8 +627,10 @@ async function showProfile(a, scroll = true) {
       <p>Recent killmails: ${a.killmail_count != null ? a.killmail_count : "—"}</p>
       <p>Contacts: ${a.contact_count != null ? a.contact_count : "—"}</p>
       <p>Medals: ${a.medal_count != null ? a.medal_count : "—"}</p>
-      <p style="margin-top:0.6rem;"><strong>Corporation history</strong></p>
-      <ul>${hist.join("") || "<li>None</li>"}</ul>
+      <details style="margin-top:0.6rem;border:1px solid var(--border);border-radius:6px;padding:0.7rem;">
+        <summary style="cursor:pointer;font-weight:600;">Corporation history</summary>
+        <ul style="margin-top:0.6rem;">${hist.join("") || "<li>None</li>"}</ul>
+      </details>
     </div>
   `;
   const acceptBtn = document.getElementById("accept-application-btn");
