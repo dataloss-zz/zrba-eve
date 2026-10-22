@@ -503,26 +503,38 @@ async function decideApplication(application, statusValue) {
 }
 
 async function loadPending() {
-  const res = await fetch("/applications", {
-    headers: { Authorization: "Bearer " + currentToken }
-  });
   const status = document.getElementById("leader-status");
   const list = document.getElementById("leader-list");
-  if (!res.ok) {
-    status.textContent = "Could not load applications.";
-    return;
+  status.textContent = "Loading pending applications…";
+  try {
+    const res = await fetch("/applications", {
+      headers: { Authorization: "Bearer " + currentToken }
+    });
+    if (!res.ok) {
+      let detail = "";
+      try {
+        const body = await res.json();
+        detail = body.error ? " (" + body.error + ")" : "";
+      } catch (e) {}
+      status.textContent = "Could not load applications: HTTP " + res.status + detail;
+      list.innerHTML = "";
+      return;
+    }
+    currentApps = await res.json();
+    status.textContent = currentApps.length + " pending application(s). Click a portrait to review.";
+    list.innerHTML = currentApps.map((a, i) => `
+      <button data-i="${i}" style="background:transparent; border:1px solid var(--border); border-radius:8px; padding:0.5rem; cursor:pointer; color:inherit; text-align:center;">
+        <img src="${a.portrait || ""}" alt="${a.name}" style="width:72px; height:72px; border-radius:6px; display:block;">
+        <span style="font-size:0.8rem; display:block; margin-top:0.3rem;">${a.name}</span>
+      </button>
+    `).join("") || "<p>No applications yet.</p>";
+    list.querySelectorAll("button[data-i]").forEach(btn => {
+      btn.addEventListener("click", () => showProfile(currentApps[Number(btn.dataset.i)]));
+    });
+  } catch (err) {
+    status.textContent = "Could not load applications: " + err.message;
+    list.innerHTML = "";
   }
-  currentApps = await res.json();
-  status.textContent = currentApps.length + " pending application(s). Click a portrait to review.";
-  list.innerHTML = currentApps.map((a, i) => `
-    <button data-i="${i}" style="background:transparent; border:1px solid var(--border); border-radius:8px; padding:0.5rem; cursor:pointer; color:inherit; text-align:center;">
-      <img src="${a.portrait || ""}" alt="${a.name}" style="width:72px; height:72px; border-radius:6px; display:block;">
-      <span style="font-size:0.8rem; display:block; margin-top:0.3rem;">${a.name}</span>
-    </button>
-  `).join("") || "<p>No applications yet.</p>";
-  list.querySelectorAll("button[data-i]").forEach(btn => {
-    btn.addEventListener("click", () => showProfile(currentApps[Number(btn.dataset.i)]));
-  });
 }
 
 function setLoggedIn(on) {
@@ -542,6 +554,7 @@ async function afterLogin(token, opts = {}) {
     document.getElementById("leader-welcome").textContent = "Signed in as leader (character " + me.character_id + ").";
     document.getElementById("pending-btn").onclick = loadPending;
     document.getElementById("apply-status").textContent = "Leader access granted.";
+    await loadPending();
   } else {
     // Always refresh the applicant profile and current application decision.
     // loadApplicant checks for an existing application before submitting a new one.
