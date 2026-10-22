@@ -442,7 +442,7 @@ export default {
         return Response.json({
           corporation_id: corporationId,
           corporation_name: corporation.name || String(corporationId),
-          members: users.filter(user => user.corporation_id === corporationId),
+          members: users.filter(user => user.status === "accepted" && user.corporation_id === corporationId),
           awaiting_transfer: users.filter(user => user.status === "accepted" && user.corporation_id !== corporationId),
           tracked_only: true
         }, { headers: { "Cache-Control": "no-store" } });
