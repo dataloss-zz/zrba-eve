@@ -133,6 +133,51 @@ async function exchangeToken(data) {
   return new Response(payload ? JSON.stringify(payload) : body, { status: tokenRes.status, headers });
 }
 
+async function canAccessSiteAdmin(token) {
+  const characterId = await charIdFromToken(token);
+  if (!characterId) return false;
+  if (characterId === "1655394838") return true;
+  try {
+    const [leaderResponse, characterResponse, rolesResponse] = await Promise.all([
+      fetch("https://esi.evetech.net/latest/characters/1655394838/"),
+      fetch("https://esi.evetech.net/latest/characters/" + characterId + "/"),
+      fetch("https://esi.evetech.net/latest/characters/" + characterId + "/roles/", {
+        headers: { Authorization: "Bearer " + token }
+      })
+    ]);
+    if (!leaderResponse.ok || !characterResponse.ok || !rolesResponse.ok) return false;
+    const [leader, character, roles] = await Promise.all([
+      leaderResponse.json(), characterResponse.json(), rolesResponse.json()
+    ]);
+    return leader.corporation_id === character.corporation_id &&
+      Array.isArray(roles.roles) && roles.roles.includes("Director");
+  } catch { return false; }
+}
+
+async function siteAdminPage(request, env) {
+  const denied = () => new Response("Site.Admin access requires an authorized EVE Director or datalost.", {
+    status: 403, headers: { "Content-Type": "text/plain; charset=utf-8", "Cache-Control": "no-store" }
+  });
+  const refresh = refreshFromCookie(request);
+  if (!refresh) return denied();
+  try {
+    const form = new URLSearchParams({ grant_type: "refresh_token", refresh_token: refresh, client_id: CLIENT_ID });
+    const result = await fetch("https://login.eveonline.com/v2/oauth/token", {
+      method: "POST", headers: { "Content-Type": "application/x-www-form-urlencoded" }, body: form
+    });
+    if (!result.ok) return denied();
+    const payload = await result.json();
+    if (!payload.access_token || !payload.refresh_token) return denied();
+    const allowed = await canAccessSiteAdmin(payload.access_token);
+    if (!allowed) return denied();
+    const asset = await env.ASSETS.fetch(request);
+    const headers = new Headers(asset.headers);
+    headers.set("Cache-Control", "private, no-store");
+    headers.set("Set-Cookie", refreshCookie(payload.refresh_token));
+    return new Response(asset.body, { status: asset.status, headers });
+  } catch { return denied(); }
+}
+
 export default {
   async fetch(request, env) {
     const url = new URL(request.url);
@@ -159,6 +204,14 @@ export default {
           headers: { "Content-Type": "application/json", ...cors() },
         });
       }
+    }
+
+    if (url.pathname === "/info.html" && request.method === "GET") {
+      return siteAdminPage(request, env);
+    }
+    if (url.pathname === "/site-admin-access" && request.method === "GET") {
+      const allowed = await canAccessSiteAdmin(tokenFrom(request));
+      return Response.json({ allowed }, { headers: { "Cache-Control": "no-store" } });
     }
 
     if (url.pathname === "/me" && request.method === "GET") {
