@@ -456,7 +456,7 @@ async function loadApplicant(token, { submitApplication = true } = {}) {
     <p>Jump fatigue: ${fatigue && fatigue.jump_fatigue_expire_date ? fatigue.jump_fatigue_expire_date : "—"}</p>
     <details style="margin-top:0.6rem;border:1px solid var(--border);border-radius:6px;padding:0.7rem;">
       <summary style="cursor:pointer;font-weight:600;">Corporation history</summary>
-      <ul style="margin-top:0.6rem;">${namedHistory.slice(0, 8).map(h => `<li>${h.corporation_name || h.corporation_id} — joined ${h.start_date ? h.start_date.slice(0,10) : "?"}</li>`).join("") || "<li>None</li>"}</ul>
+      <ul style="margin-top:0.6rem;">${namedHistory.slice(0, 8).map(h => `<li>${h.corporation_name || h.corporation_id}<div style="margin-top:0.2rem;color:var(--muted);">— Joined ${h.start_date ? h.start_date.slice(0,10) : "?"}</div></li>`).join("") || "<li>None</li>"}</ul>
     </details>
   `;
   document.getElementById("apply-status").textContent = existingApplication ? "Your application status is shown above your profile." : (submitApplication ? "Submitting your application…" : "Your character profile is shown below.");
@@ -741,7 +741,7 @@ async function showProfile(a, scroll = true) {
   const hist = [];
   for (const h of (a.history || []).slice(0, 12)) {
     const name = h.corporation_name && isNaN(Number(h.corporation_name)) ? h.corporation_name : await corpNameFor(h.corporation_id);
-    hist.push(`<li>${name} — ${h.start_date ? h.start_date.slice(0,10) : "?"}</li>`);
+    hist.push(`<li>${name}<div style="margin-top:0.2rem;color:var(--muted);">— Joined ${h.start_date ? h.start_date.slice(0,10) : "?"}</div></li>`);
   }
   const declined = a.status === "declined";
   detail.innerHTML = `
