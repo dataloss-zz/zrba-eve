@@ -912,9 +912,11 @@ document.getElementById("public-btn").addEventListener("click", async () => {
   try {
     const token = saved && sessionExpiryMs(saved) > Date.now() + 90000 ? saved : await refreshSession();
     if (token) await afterLogin(token, { skipSubmit: true });
+    else window.location.replace("/");
   } catch (e) {
     sessionStorage.removeItem("access_token");
     document.getElementById("apply-status").textContent = e.message || "Please log in again.";
+    window.location.replace("/");
   } finally {
     document.body.classList.remove("session-booting");
   }
