@@ -278,6 +278,19 @@ async function esiAuth(path, token) {
   return res.json();
 }
 
+const corpNameCache = {};
+async function corpNameFor(id) {
+  if (!id) return "—";
+  if (corpNameCache[id]) return corpNameCache[id];
+  try {
+    const c = await fetch(`https://esi.evetech.net/latest/corporations/${id}/`).then(r => r.json());
+    corpNameCache[id] = c.name || String(id);
+  } catch (e) {
+    corpNameCache[id] = String(id);
+  }
+  return corpNameCache[id];
+}
+
 async function loadApplicant(token) {
   const claims = parseJwt(token);
   const charId = claims.sub.split(":").pop();
@@ -299,18 +312,6 @@ async function loadApplicant(token) {
     has("esi-characters.read_fw_stats.v1") ? esiAuth(`/characters/${charId}/fw/stats/`, token) : null,
     has("esi-characters.read_freelance_jobs.v1") ? esiAuth(`/characters/${charId}/freelance/jobs/`, token) : null
   ]);
-  const corpNames = {};
-  async function corpNameFor(id) {
-    if (!id) return "—";
-    if (corpNames[id]) return corpNames[id];
-    try {
-      const c = await fetch(`https://esi.evetech.net/latest/corporations/${id}/`).then(r => r.json());
-      corpNames[id] = c.name || String(id);
-    } catch (e) {
-      corpNames[id] = String(id);
-    }
-    return corpNames[id];
-  }
   let corpName = await corpNameFor(char.corporation_id);
   const namedHistory = [];
   for (const h of (history || []).slice(0, 12)) {
@@ -380,14 +381,21 @@ document.getElementById("logout-link").addEventListener("click", (e) => {
 let currentToken = null;
 let currentApps = [];
 
-function showProfile(a) {
+async function showProfile(a) {
   const detail = document.getElementById("leader-detail");
+  detail.innerHTML = "<p>Loading profile…</p>";
+  const currentCorp = a.corporation && isNaN(Number(a.corporation)) ? a.corporation : await corpNameFor(a.corporation_id || a.corporation);
+  const hist = [];
+  for (const h of (a.history || []).slice(0, 12)) {
+    const name = h.corporation_name && isNaN(Number(h.corporation_name)) ? h.corporation_name : await corpNameFor(h.corporation_id);
+    hist.push(`<li>${name} — ${h.start_date ? h.start_date.slice(0,10) : "?"}</li>`);
+  }
   detail.innerHTML = `
     <div class="card">
       <img src="${a.portrait || ""}" alt="" style="border-radius:6px; width:96px; height:96px;">
       <h4 style="margin-top:0.6rem;">${a.name}</h4>
       <p>Character ID: ${a.character_id}</p>
-      <p>Corporation: ${a.corporation || a.corporation_id}</p>
+      <p>Corporation: ${currentCorp}</p>
       <p>Security: ${a.security_status != null ? Number(a.security_status).toFixed(2) : "—"}</p>
       <p>Birthday: ${a.birthday ? String(a.birthday).slice(0,10) : "—"}</p>
       <p>Submitted: ${a.submitted_at || "—"}</p>
@@ -395,7 +403,7 @@ function showProfile(a) {
       <p>Contacts: ${a.contact_count != null ? a.contact_count : "—"}</p>
       <p>Medals: ${a.medal_count != null ? a.medal_count : "—"}</p>
       <p style="margin-top:0.6rem;"><strong>Corporation history</strong></p>
-      <ul>${(a.history || []).slice(0, 12).map(h => `<li>${h.corporation_name || ("Corp " + h.corporation_id)} — ${h.start_date ? h.start_date.slice(0,10) : "?"}</li>`).join("") || "<li>None</li>"}</ul>
+      <ul>${hist.join("") || "<li>None</li>"}</ul>
     </div>
   `;
   detail.scrollIntoView({ behavior: "smooth" });
