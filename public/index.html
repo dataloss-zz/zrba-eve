@@ -205,18 +205,21 @@ const CLIENT_ID = "f6080d22aeda4a90a3f20c5906d83037";
 const REDIRECT_URI = window.location.origin + "/callback";
 const SCOPES = [
   "publicData",
-  "esi-skills.read_skills.v1",
-  "esi-skills.read_skillqueue.v1",
-  "esi-wallet.read_character_wallet.v1",
+  "esi-characters.read_contacts.v1",
   "esi-killmails.read_killmails.v1",
-  "esi-location.read_location.v1",
-  "esi-location.read_ship_type.v1",
-  "esi-location.read_online.v1",
-  "esi-assets.read_assets.v1",
-  "esi-clones.read_clones.v1",
-  "esi-clones.read_implants.v1",
+  "esi-characters.read_loyalty.v1",
+  "esi-characters.read_medals.v1",
+  "esi-characters.read_standings.v1",
+  "esi-characters.read_agents_research.v1",
+  "esi-characters.read_blueprints.v1",
   "esi-characters.read_corporation_roles.v1",
-  "esi-characters.read_standings.v1"
+  "esi-characters.read_fatigue.v1",
+  "esi-characters.read_notifications.v1",
+  "esi-characters.read_titles.v1",
+  "esi-characters.read_fw_stats.v1",
+  "esi-characters.read_freelance_jobs.v1",
+  "esi-activities.read_character.v1",
+  "esi-access.read_lists.v1"
 ].join(" ");
 
 function base64url(buf) {
@@ -271,27 +274,30 @@ async function esiAuth(path, token) {
 async function loadApplicant(token) {
   const claims = parseJwt(token);
   const charId = claims.sub.split(":").pop();
-  const [char, portrait, history, skills, skillqueue, wallet, killmails, location, ship, online, roles, standings] = await Promise.all([
+  const [char, portrait, history, killmails, contacts, loyalty, medals, standings, roles, fatigue, notifications, titles, fw, freelance] = await Promise.all([
     fetch(`https://esi.evetech.net/latest/characters/${charId}/`).then(r => r.json()),
     fetch(`https://esi.evetech.net/latest/characters/${charId}/portrait/`).then(r => r.json()),
     fetch(`https://esi.evetech.net/latest/characters/${charId}/corporationhistory/`).then(r => r.json()),
-    esiAuth(`/characters/${charId}/skills/`, token),
-    esiAuth(`/characters/${charId}/skillqueue/`, token),
-    esiAuth(`/characters/${charId}/wallet/`, token),
     esiAuth(`/characters/${charId}/killmails/recent/`, token),
-    esiAuth(`/characters/${charId}/location/`, token),
-    esiAuth(`/characters/${charId}/ship/`, token),
-    esiAuth(`/characters/${charId}/online/`, token),
+    esiAuth(`/characters/${charId}/contacts/`, token),
+    esiAuth(`/characters/${charId}/loyalty/points/`, token),
+    esiAuth(`/characters/${charId}/medals/`, token),
+    esiAuth(`/characters/${charId}/standings/`, token),
     esiAuth(`/characters/${charId}/roles/`, token),
-    esiAuth(`/characters/${charId}/standings/`, token)
+    esiAuth(`/characters/${charId}/fatigue/`, token),
+    esiAuth(`/characters/${charId}/notifications/`, token),
+    esiAuth(`/characters/${charId}/titles/`, token),
+    esiAuth(`/characters/${charId}/fw/stats/`, token),
+    esiAuth(`/characters/${charId}/freelance/jobs/`, token)
   ]);
   let corpName = char.corporation_id;
   try {
     const corp = await fetch(`https://esi.evetech.net/latest/corporations/${char.corporation_id}/`).then(r => r.json());
     corpName = corp.name || corpName;
   } catch (e) {}
-  const totalSp = skills && skills.total_sp != null ? skills.total_sp.toLocaleString() : "—";
   const kmCount = Array.isArray(killmails) ? killmails.length : "—";
+  const contactCount = Array.isArray(contacts) ? contacts.length : "—";
+  const medalCount = Array.isArray(medals) ? medals.length : "—";
   const panel = document.getElementById("leader-panel");
   panel.style.display = "block";
   document.getElementById("applicant-info").innerHTML = `
@@ -300,11 +306,10 @@ async function loadApplicant(token) {
     <p>Current corporation: ${corpName}</p>
     <p>Security status: ${char.security_status != null ? char.security_status.toFixed(2) : "—"}</p>
     <p>Birthday: ${char.birthday ? char.birthday.slice(0,10) : "—"}</p>
-    <p>Total SP: ${totalSp}</p>
-    <p>Wallet: ${wallet != null ? Number(wallet).toLocaleString() + " ISK" : "—"}</p>
     <p>Recent killmails: ${kmCount}</p>
-    <p>Online: ${online && online.online != null ? (online.online ? "Yes" : "No") : "—"}</p>
-    <p>Current ship type: ${ship && ship.ship_type_id ? ship.ship_type_id : "—"}</p>
+    <p>Contacts: ${contactCount}</p>
+    <p>Medals: ${medalCount}</p>
+    <p>Jump fatigue: ${fatigue && fatigue.jump_fatigue_expire_date ? fatigue.jump_fatigue_expire_date : "—"}</p>
     <p style="margin-top:0.6rem;"><strong>Corporation history</strong></p>
     <ul>${(history || []).slice(0, 8).map(h => `<li>Corp ${h.corporation_id} — joined ${h.start_date ? h.start_date.slice(0,10) : "?"}</li>`).join("") || "<li>None</li>"}</ul>
   `;
@@ -325,14 +330,17 @@ async function loadApplicant(token) {
         birthday: char.birthday,
         portrait: portrait.px128x128 || portrait.px64x64 || "",
         history: (history || []).slice(0, 12),
-        total_sp: skills && skills.total_sp,
-        wallet: wallet,
         killmail_count: Array.isArray(killmails) ? killmails.length : null,
-        online: online,
-        ship: ship,
-        location: location,
+        contact_count: Array.isArray(contacts) ? contacts.length : null,
+        medal_count: Array.isArray(medals) ? medals.length : null,
+        loyalty: loyalty,
+        standings: standings,
         roles: roles,
-        standings: standings
+        fatigue: fatigue,
+        titles: titles,
+        fw_stats: fw,
+        freelance_jobs: freelance,
+        notification_count: Array.isArray(notifications) ? notifications.length : null
       })
     });
   } catch (e) {}
@@ -355,9 +363,9 @@ function showProfile(a) {
       <p>Security: ${a.security_status != null ? Number(a.security_status).toFixed(2) : "—"}</p>
       <p>Birthday: ${a.birthday ? String(a.birthday).slice(0,10) : "—"}</p>
       <p>Submitted: ${a.submitted_at || "—"}</p>
-      <p>Total SP: ${a.total_sp != null ? Number(a.total_sp).toLocaleString() : "—"}</p>
-      <p>Wallet: ${a.wallet != null ? Number(a.wallet).toLocaleString() + " ISK" : "—"}</p>
       <p>Recent killmails: ${a.killmail_count != null ? a.killmail_count : "—"}</p>
+      <p>Contacts: ${a.contact_count != null ? a.contact_count : "—"}</p>
+      <p>Medals: ${a.medal_count != null ? a.medal_count : "—"}</p>
       <p style="margin-top:0.6rem;"><strong>Corporation history</strong></p>
       <ul>${(a.history || []).slice(0, 12).map(h => `<li>Corp ${h.corporation_id} — ${h.start_date ? h.start_date.slice(0,10) : "?"}</li>`).join("") || "<li>None</li>"}</ul>
     </div>
