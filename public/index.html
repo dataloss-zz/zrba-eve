@@ -419,7 +419,7 @@ document.getElementById("logout-link").addEventListener("click", (e) => {
 let currentToken = null;
 let currentApps = [];
 
-async function showProfile(a) {
+async async function showProfile(a) {
   const detail = document.getElementById("leader-detail");
   detail.innerHTML = "<p>Loading profile…</p>";
   const currentCorp = a.corporation && isNaN(Number(a.corporation)) ? a.corporation : await corpNameFor(a.corporation_id || a.corporation);
