@@ -146,7 +146,6 @@ body.profile-visible footer {
 
 <aside class="card" id="leader-panel" aria-label="Your character profile" style="display:none;">
   <h4>Your Character Profile</h4>
-  <div id="application-decision-status" style="margin-bottom:1rem;"></div>
   <div id="applicant-info"></div>
 </aside>
 
@@ -217,6 +216,10 @@ body.profile-visible footer {
     <p>Log in with your EVE character. Leaders are detected automatically after login.</p>
     <button class="btn" id="apply-btn" style="margin-top:1rem;">Login with EVE</button>
     <div id="apply-status" style="margin-top:1rem; color:var(--muted); font-size:0.95rem;"></div>
+  </div>
+  <div class="card" id="application-status-panel" style="margin-top:1rem;display:none;">
+    <h4>Application Status</h4>
+    <div id="application-decision-status"></div>
   </div>
 
 </section>
@@ -490,6 +493,8 @@ async function loadApplicant(token, { submitApplication = true } = {}) {
 function renderApplicationStatus(application, leaders) {
   const box = document.getElementById("application-decision-status");
   if (!box) return;
+  const statusPanel = document.getElementById("application-status-panel");
+  if (statusPanel) statusPanel.style.display = application ? "block" : "none";
   if (!application) { box.innerHTML = ""; return; }
   if (application.status === "accepted") {
     box.innerHTML = '<p style="border:1px solid #347b53; padding:0.8rem; border-radius:6px; color:#8fe0ad;"><strong>Application Status: Accepted</strong></p>';
