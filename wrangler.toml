@@ -5,7 +5,7 @@ compatibility_date = "2026-10-22"
 [assets]
 directory = "./public"
 binding = "ASSETS"
-run_worker_first = ["/exchange", "/refresh", "/logout", "/callback", "/applications", "/application-status", "/application-decision", "/application-review", "/application-discussion", "/corp-officers", "/me"]
+run_worker_first = ["/exchange", "/refresh", "/logout", "/callback", "/applications", "/application-status", "/application-decision", "/application-review", "/application-discussion", "/corp-officers", "/corp-officers/remove", "/me"]
 
 [[kv_namespaces]]
 binding = "APPLICATIONS"
