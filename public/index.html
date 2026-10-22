@@ -193,6 +193,7 @@ footer {
   <div class="card">
     <p id="leader-welcome">You are signed in as a leader.</p>
     <button class="btn" id="pending-btn" style="margin-top:1rem;">Pending Applications</button>
+    <button class="btn btn-outline" id="declined-btn" style="margin-top:1rem;">Declined Applications</button>
     <div id="leader-status" style="margin-top:1rem; color:var(--muted); font-size:0.95rem;"></div>
     <div id="leader-list" style="margin-top:1rem; display:flex; flex-wrap:wrap; gap:1rem;"></div>
     <div id="leader-detail" style="margin-top:1rem;"></div>
@@ -406,8 +407,39 @@ function renderApplicationStatus(application, leaders) {
   if (application.status === "accepted") {
     box.innerHTML = '<p style="border:1px solid #347b53; padding:0.8rem; border-radius:6px; color:#8fe0ad;"><strong>Application Status: Accepted</strong></p>';
   } else if (application.status === "declined") {
-    const list = leaders.map(name => '<li>' + escapeHtml(name) + '</li>').join("");
-    box.innerHTML = '<div style="border:1px solid #9b4242; padding:0.8rem; border-radius:6px;"><p style="color:#ff9b9b;"><strong>Application Status: Declined</strong></p><p style="margin-top:0.5rem;">If you are declined, please contact one of the recruitment leaders from this list.</p><ul style="margin-top:0.4rem;">' + (list || "<li>Recruitment leader list not configured.</li>") + '</ul></div>';
+    const availableLeaders = leaders.map(l => typeof l === "string" ? { id: "", name: l } : l);
+    box.innerHTML = '<div style="border:1px solid #9b4242; padding:0.8rem; border-radius:6px;">' +
+      '<p style="color:#ff9b9b;"><strong>Application Status: Declined</strong></p>' +
+      '<p style="margin:0.5rem 0;">If you spoke with a recruitment leader, briefly summarize the discussion below.</p>' +
+      '<textarea id="discussion-summary" maxlength="1000" rows="4" placeholder="Briefly summarize your discussion (maximum 1000 characters)" style="width:100%;padding:0.6rem;background:var(--bg);color:var(--text);border:1px solid var(--border);border-radius:5px;">' + escapeHtml(application.discussion?.summary || "") + '</textarea>' +
+      '<p style="margin:0.5rem 0;">Select the leader you spoke with to save your summary:</p>' +
+      '<div id="discussion-leaders" style="display:flex;gap:0.5rem;flex-wrap:wrap;"></div>' +
+      '<p id="discussion-status" style="margin-top:0.5rem;color:var(--muted);"></p></div>';
+    const buttons = document.getElementById("discussion-leaders");
+    availableLeaders.forEach(leader => {
+      if (!leader.id) return;
+      const button = document.createElement("button");
+      button.className = "btn";
+      button.style.cssText = "font-size:0.85rem;padding:0.35rem 0.75rem;";
+      button.textContent = leader.name;
+      button.onclick = async () => {
+        const summary = document.getElementById("discussion-summary").value.trim();
+        const message = document.getElementById("discussion-status");
+        if (!summary) { message.textContent = "Enter a summary first."; return; }
+        message.textContent = "Saving…";
+        try {
+          const response = await fetch("/application-discussion", {
+            method: "POST",
+            headers: { "Content-Type": "application/json", Authorization: "Bearer " + currentToken },
+            body: JSON.stringify({ summary, leader_id: leader.id })
+          });
+          const result = await response.json();
+          if (!response.ok) throw new Error(result.error || "Save failed");
+          message.textContent = "Discussion with " + leader.name + " saved.";
+        } catch (error) { message.textContent = "Could not save: " + error.message; }
+      };
+      buttons.appendChild(button);
+    });
   } else {
     box.innerHTML = '<p style="border:1px solid var(--border); padding:0.8rem; border-radius:6px;"><strong>Application Status: Pending review</strong></p>';
   }
@@ -437,6 +469,7 @@ document.querySelectorAll("button").forEach(button => {
     else if (button.id === "apply-btn" || button.id === "sso-btn") setHoverInfo("https://login.eveonline.com/v2/oauth/authorize");
     else if (button.id === "public-btn") setHoverInfo("GET https://esi.evetech.net/latest/corporations/1000001/?datasource=tranquility");
     else if (button.id === "pending-btn") setHoverInfo("GET /applications");
+    else if (button.id === "declined-btn") setHoverInfo("GET /applications?status=declined");
     else if (button.id === "accept-application-btn" || button.id === "decline-application-btn") setHoverInfo("POST /application-decision");
     else setHoverInfo("");
   });
@@ -453,6 +486,7 @@ document.getElementById("logout-link").addEventListener("click", (e) => {
 
 let currentToken = null;
 let currentApps = [];
+let currentListStatus = "pending";
 
 async function showProfile(a) {
   const detail = document.getElementById("leader-detail");
@@ -463,12 +497,12 @@ async function showProfile(a) {
     const name = h.corporation_name && isNaN(Number(h.corporation_name)) ? h.corporation_name : await corpNameFor(h.corporation_id);
     hist.push(`<li>${name} — ${h.start_date ? h.start_date.slice(0,10) : "?"}</li>`);
   }
+  const declined = a.status === "declined";
   detail.innerHTML = `
     <div class="card">
       <img src="${a.portrait || ""}" alt="" style="border-radius:6px; width:96px; height:96px; display:block;">
       <div style="display:flex; gap:0.6rem; margin:0.6rem 0 1rem;">
-        <button class="btn" id="accept-application-btn" style="background:#347b53;color:#fff;">Accept</button>
-        <button class="btn" id="decline-application-btn" style="background:#9b4242;color:#fff;">Decline</button>
+        ${declined ? '<button class="btn" id="review-application-btn">Review — return to pending</button>' : '<button class="btn" id="accept-application-btn" style="background:#347b53;color:#fff;">Accept</button><button class="btn" id="decline-application-btn" style="background:#9b4242;color:#fff;">Decline</button>'}
       </div>
       <h4 style="margin-top:0.6rem;">${a.name}</h4>
       <p>Character ID: ${a.character_id}</p>
@@ -476,6 +510,8 @@ async function showProfile(a) {
       <p>Security: ${a.security_status != null ? Number(a.security_status).toFixed(2) : "—"}</p>
       <p>Birthday: ${a.birthday ? String(a.birthday).slice(0,10) : "—"}</p>
       <p>Submitted: ${a.submitted_at || "—"}</p>
+      ${a.discussion ? `<p><strong>Applicant discussion with ${escapeHtml(a.discussion.leader_name || "")}:</strong> ${escapeHtml(a.discussion.summary || "")}</p>` : ""}
+      ${a.review_history?.length ? `<p><strong>Review history:</strong> ${a.review_history.map(r => escapeHtml(r.leader_name || r.leader_id) + " — " + escapeHtml(r.reviewed_at)).join("; ")}</p>` : ""}
       <p>Recent killmails: ${a.killmail_count != null ? a.killmail_count : "—"}</p>
       <p>Contacts: ${a.contact_count != null ? a.contact_count : "—"}</p>
       <p>Medals: ${a.medal_count != null ? a.medal_count : "—"}</p>
@@ -487,6 +523,8 @@ async function showProfile(a) {
   const declineBtn = document.getElementById("decline-application-btn");
   if (acceptBtn) acceptBtn.onclick = () => decideApplication(a, "accepted");
   if (declineBtn) declineBtn.onclick = () => decideApplication(a, "declined");
+  const reviewBtn = document.getElementById("review-application-btn");
+  if (reviewBtn) reviewBtn.onclick = () => reopenApplication(a);
   detail.scrollIntoView({ behavior: "smooth" });
 }
 
@@ -509,12 +547,30 @@ async function decideApplication(application, statusValue) {
   }
 }
 
-async function loadPending() {
+async function reopenApplication(application) {
+  const status = document.getElementById("leader-status");
+  status.textContent = "Returning application to pending…";
+  try {
+    const response = await fetch("/application-review", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Authorization: "Bearer " + currentToken },
+      body: JSON.stringify({ application_key: application.application_key })
+    });
+    const result = await response.json();
+    if (!response.ok) throw new Error(result.error || "Review failed");
+    document.getElementById("leader-detail").innerHTML = "";
+    await loadPending();
+    status.textContent += " Application reopened for review.";
+  } catch (error) { status.textContent = "Could not reopen application: " + error.message; }
+}
+
+async function loadPending(type = "pending") {
+  currentListStatus = type === "declined" ? "declined" : "pending";
   const status = document.getElementById("leader-status");
   const list = document.getElementById("leader-list");
-  status.textContent = "Loading pending applications…";
+  status.textContent = "Loading " + currentListStatus + " applications…";
   try {
-    const res = await fetch("/applications", {
+    const res = await fetch("/applications?status=" + currentListStatus, {
       headers: { Authorization: "Bearer " + currentToken }
     });
     if (!res.ok) {
@@ -528,7 +584,7 @@ async function loadPending() {
       return;
     }
     currentApps = await res.json();
-    status.textContent = currentApps.length + " pending application(s). Click a portrait to review.";
+    status.textContent = currentApps.length + " " + currentListStatus + " application(s). Click a portrait to review.";
     list.innerHTML = currentApps.map((a, i) => `
       <button data-i="${i}" style="background:transparent; border:1px solid var(--border); border-radius:8px; padding:0.5rem; cursor:pointer; color:inherit; text-align:center;">
         <img src="${a.portrait || ""}" alt="${a.name}" style="width:72px; height:72px; border-radius:6px; display:block;">
@@ -559,7 +615,8 @@ async function afterLogin(token, opts = {}) {
   if (me.is_leader) {
     document.getElementById("leaders").style.display = "block";
     document.getElementById("leader-welcome").textContent = "Signed in as leader (character " + me.character_id + ").";
-    document.getElementById("pending-btn").onclick = loadPending;
+    document.getElementById("pending-btn").onclick = () => loadPending("pending");
+    document.getElementById("declined-btn").onclick = () => loadPending("declined");
     document.getElementById("apply-status").textContent = "Leader access granted.";
     await loadPending();
   } else {
