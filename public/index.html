@@ -108,6 +108,7 @@ footer {
     <a href="#comms">Communications</a>
     <a href="#esi">ESI / API</a>
     <a href="#join">Join</a>
+    <a href="#" id="logout-link" style="display:none;">Logout</a>
   </nav>
 </header>
 
@@ -298,11 +299,23 @@ async function loadApplicant(token) {
     has("esi-characters.read_fw_stats.v1") ? esiAuth(`/characters/${charId}/fw/stats/`, token) : null,
     has("esi-characters.read_freelance_jobs.v1") ? esiAuth(`/characters/${charId}/freelance/jobs/`, token) : null
   ]);
-  let corpName = char.corporation_id;
-  try {
-    const corp = await fetch(`https://esi.evetech.net/latest/corporations/${char.corporation_id}/`).then(r => r.json());
-    corpName = corp.name || corpName;
-  } catch (e) {}
+  const corpNames = {};
+  async function corpNameFor(id) {
+    if (!id) return "—";
+    if (corpNames[id]) return corpNames[id];
+    try {
+      const c = await fetch(`https://esi.evetech.net/latest/corporations/${id}/`).then(r => r.json());
+      corpNames[id] = c.name || String(id);
+    } catch (e) {
+      corpNames[id] = String(id);
+    }
+    return corpNames[id];
+  }
+  let corpName = await corpNameFor(char.corporation_id);
+  const namedHistory = [];
+  for (const h of (history || []).slice(0, 12)) {
+    namedHistory.push({ ...h, corporation_name: await corpNameFor(h.corporation_id) });
+  }
   const kmCount = Array.isArray(killmails) ? killmails.length : "—";
   const contactCount = Array.isArray(contacts) ? contacts.length : "—";
   const medalCount = Array.isArray(medals) ? medals.length : "—";
@@ -319,7 +332,7 @@ async function loadApplicant(token) {
     <p>Medals: ${medalCount}</p>
     <p>Jump fatigue: ${fatigue && fatigue.jump_fatigue_expire_date ? fatigue.jump_fatigue_expire_date : "—"}</p>
     <p style="margin-top:0.6rem;"><strong>Corporation history</strong></p>
-    <ul>${(history || []).slice(0, 8).map(h => `<li>Corp ${h.corporation_id} — joined ${h.start_date ? h.start_date.slice(0,10) : "?"}</li>`).join("") || "<li>None</li>"}</ul>
+    <ul>${namedHistory.slice(0, 8).map(h => `<li>${h.corporation_name || h.corporation_id} — joined ${h.start_date ? h.start_date.slice(0,10) : "?"}</li>`).join("") || "<li>None</li>"}</ul>
   `;
   document.getElementById("apply-status").textContent = "Application submitted with extended ESI data.";
   try {
@@ -337,7 +350,7 @@ async function loadApplicant(token) {
         security_status: char.security_status,
         birthday: char.birthday,
         portrait: portrait.px128x128 || portrait.px64x64 || "",
-        history: (history || []).slice(0, 12),
+        history: namedHistory,
         killmail_count: Array.isArray(killmails) ? killmails.length : null,
         contact_count: Array.isArray(contacts) ? contacts.length : null,
         medal_count: Array.isArray(medals) ? medals.length : null,
@@ -357,6 +370,12 @@ async function loadApplicant(token) {
 
 document.getElementById("apply-btn").addEventListener("click", startLogin);
 document.getElementById("sso-btn").addEventListener("click", startLogin);
+document.getElementById("logout-link").addEventListener("click", (e) => {
+  e.preventDefault();
+  sessionStorage.removeItem("access_token");
+  sessionStorage.removeItem("pkce_verifier");
+  window.location.href = "/";
+});
 
 let currentToken = null;
 let currentApps = [];
@@ -376,7 +395,7 @@ function showProfile(a) {
       <p>Contacts: ${a.contact_count != null ? a.contact_count : "—"}</p>
       <p>Medals: ${a.medal_count != null ? a.medal_count : "—"}</p>
       <p style="margin-top:0.6rem;"><strong>Corporation history</strong></p>
-      <ul>${(a.history || []).slice(0, 12).map(h => `<li>Corp ${h.corporation_id} — ${h.start_date ? h.start_date.slice(0,10) : "?"}</li>`).join("") || "<li>None</li>"}</ul>
+      <ul>${(a.history || []).slice(0, 12).map(h => `<li>${h.corporation_name || ("Corp " + h.corporation_id)} — ${h.start_date ? h.start_date.slice(0,10) : "?"}</li>`).join("") || "<li>None</li>"}</ul>
     </div>
   `;
   detail.scrollIntoView({ behavior: "smooth" });
@@ -405,8 +424,16 @@ async function loadPending() {
   });
 }
 
+function setLoggedIn(on) {
+  document.querySelectorAll("#apply-btn, #sso-btn").forEach(el => el.style.display = on ? "none" : "");
+  const lo = document.getElementById("logout-link");
+  if (lo) lo.style.display = on ? "inline" : "none";
+}
+
 async function afterLogin(token) {
   currentToken = token;
+  sessionStorage.setItem("access_token", token);
+  setLoggedIn(true);
   const meRes = await fetch("/me", { headers: { Authorization: "Bearer " + token } });
   const me = await meRes.json();
   if (me.is_leader) {
