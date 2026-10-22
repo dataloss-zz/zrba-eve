@@ -262,7 +262,7 @@ body.officer-page.session-booting #leaders, body.officer-page.session-booting #c
     <p style="color:var(--muted);font-size:0.9rem;">Only characters who registered through this website are shown. Corporation affiliation is checked against EVE ESI when this page is loaded.</p>
     <button class="btn btn-outline" id="officers-refresh-btn" type="button">Refresh</button>
     <p id="officers-status" style="margin-top:0.8rem;color:var(--muted);"></p>
-    <h4 style="margin-top:1rem;">Current Corporation Members (<span id="officers-member-count">0</span>)</h4>
+    <h4 style="margin-top:1rem;">Accepted Corporation Members (<span id="officers-member-count">0</span>)</h4>
     <div id="officers-members"></div>
     <h4 style="margin-top:1.5rem;">Accepted — Awaiting Corporation Transfer (<span id="officers-awaiting-count">0</span>)</h4>
     <div id="officers-awaiting"></div>
@@ -649,10 +649,20 @@ async function loadCorpOfficers() {
     document.getElementById("officers-corp-name").textContent = data.corporation_name + " (Corporation ID: " + data.corporation_id + ")";
     const render = (users, target, count) => {
       document.getElementById(count).textContent = users.length;
+      const isMembers = target === "officers-members";
       document.getElementById(target).innerHTML = users.length
-        ? '<ul style="padding-left:1.4rem;">' + users.sort((a,b) => a.name.localeCompare(b.name)).map(user =>
-            '<li style="margin:0.45rem 0;">' + escapeHtml(user.name) + ' <span style="color:var(--muted);font-size:0.85rem;">(' + escapeHtml(user.character_id) + ')</span> <button type="button" class="remove-member-btn" data-character-id="' + user.character_id + '" data-character-name="' + escapeHtml(user.name) + '" style="font-size:0.72rem;padding:0.2rem 0.45rem;margin-left:0.5rem;background:transparent;color:#ff9c9c;border:1px solid #a45a5a;border-radius:4px;cursor:pointer;">Remove from Corp</button></li>').join("") + '</ul>'
-        : '<p style="color:var(--muted);">No registered characters in this category.</p>';
+        ? '<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(135px,1fr));gap:0.9rem;margin-top:0.7rem;">' +
+          users.sort((a,b) => a.name.localeCompare(b.name)).map(user => {
+            const name = escapeHtml(user.name);
+            const id = encodeURIComponent(user.character_id);
+            const portrait = 'https://images.evetech.net/characters/' + id + '/portrait?size=128';
+            return '<div style="text-align:center;border:1px solid var(--border);border-radius:7px;padding:0.65rem;min-width:0;">' +
+              '<img src="' + portrait + '" alt="' + name + '" loading="lazy" style="width:96px;height:96px;max-width:100%;object-fit:cover;border-radius:6px;display:block;margin:0 auto 0.45rem;">' +
+              '<div style="font-size:0.9rem;font-weight:600;overflow-wrap:anywhere;">' + name + '</div>' +
+              '<button type="button" class="remove-member-btn" data-character-id="' + id + '" data-character-name="' + name + '" style="font-size:0.72rem;padding:0.2rem 0.45rem;margin-top:0.55rem;background:transparent;color:#ff9c9c;border:1px solid #a45a5a;border-radius:4px;cursor:pointer;">Remove from Corp</button>' +
+              '</div>';
+          }).join("") + '</div>'
+        : '<p style="color:var(--muted);">' + (isMembers ? 'No accepted registered corporation members yet.' : 'No accepted characters awaiting transfer.') + '</p>';
     };
     render(data.members, "officers-members", "officers-member-count");
     render(data.awaiting_transfer, "officers-awaiting", "officers-awaiting-count");
