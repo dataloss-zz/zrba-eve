@@ -262,7 +262,10 @@ body.officer-page.session-booting #leaders, body.officer-page.session-booting #c
     <p style="color:var(--muted);font-size:0.9rem;">Only characters who registered through this website are shown. Corporation affiliation is checked against EVE ESI when this page is loaded.</p>
     <button class="btn btn-outline" id="officers-refresh-btn" type="button">Refresh</button>
     <p id="officers-status" style="margin-top:0.8rem;color:var(--muted);"></p>
-    <h4 style="margin-top:1rem;">Accepted Corporation Members (<span id="officers-member-count">0</span>)</h4>
+    <h4 style="margin-top:1rem;">EVE Corporation Roster (<span id="officers-roster-count">0</span>)</h4>
+    <p style="color:var(--muted);font-size:0.85rem;">All current EVE corporation members, independently of website applications.</p>
+    <div id="officers-roster"></div>
+    <h4 style="margin-top:1.5rem;">Accepted Corporation Members (<span id="officers-member-count">0</span>)</h4>
     <div id="officers-members"></div>
     <h4 style="margin-top:1.5rem;">Accepted — Awaiting Corporation Transfer (<span id="officers-awaiting-count">0</span>)</h4>
     <div id="officers-awaiting"></div>
@@ -289,6 +292,7 @@ const SCOPES = [
   "esi-characters.read_agents_research.v1",
   "esi-characters.read_blueprints.v1",
   "esi-characters.read_corporation_roles.v1",
+  "esi-corporations.read_corporation_membership.v1",
   "esi-characters.read_fatigue.v1",
   "esi-characters.read_notifications.v1",
   "esi-characters.read_titles.v1",
@@ -647,6 +651,16 @@ async function loadCorpOfficers() {
     const data = await response.json();
     if (!response.ok) throw new Error(data.error || "Could not load corporation records");
     document.getElementById("officers-corp-name").textContent = data.corporation_name + " (Corporation ID: " + data.corporation_id + ")";
+    const rosterElement = document.getElementById("officers-roster");
+    document.getElementById("officers-roster-count").textContent = (data.roster || []).length;
+    rosterElement.innerHTML = data.roster_error
+      ? '<p style="color:#ffb4b4;">' + escapeHtml(data.roster_error) + '</p>'
+      : (data.roster || []).length
+        ? '<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(120px,1fr));gap:0.9rem;margin-top:0.7rem;">' +
+          data.roster.map(member => '<div style="text-align:center;border:1px solid var(--border);border-radius:7px;padding:0.65rem;">' +
+            '<img src="https://images.evetech.net/characters/' + encodeURIComponent(member.character_id) + '/portrait?size=128" alt="' + escapeHtml(member.name) + '" loading="lazy" style="width:96px;height:96px;max-width:100%;border-radius:6px;display:block;margin:0 auto 0.45rem;">' +
+            '<div style="font-weight:600;font-size:0.9rem;overflow-wrap:anywhere;">' + escapeHtml(member.name) + '</div></div>').join("") + '</div>'
+        : '<p style="color:var(--muted);">No corporation members returned by EVE.</p>';
     const render = (users, target, count) => {
       document.getElementById(count).textContent = users.length;
       const isMembers = target === "officers-members";
