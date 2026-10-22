@@ -105,11 +105,33 @@ footer {
   z-index: 9;
   box-shadow: 0 8px 28px rgba(0,0,0,0.35);
 }
+/* Reserve the sidebar once for every content section, then center each section
+   within the same remaining horizontal space. */
 body.profile-visible .hero,
 body.profile-visible section,
 body.profile-visible footer {
   margin-left: 324px;
 }
+@media (min-width: 901px) {
+  body.profile-visible .hero,
+  body.profile-visible section:not(#esi) {
+    width: calc(100% - 324px);
+    max-width: none;
+    margin-right: 0;
+  }
+  body.profile-visible #mission .mission-story,
+  body.profile-visible #comms > .grid {
+    max-width: 900px;
+    margin-left: auto;
+    margin-right: auto;
+  }
+  body.profile-visible #mission > h3,
+  body.profile-visible #comms > h3 {
+    text-align: center;
+  }
+}
+#comms > h3 { text-align: center; }
+#comms > .grid { max-width: 900px; margin-left: auto; margin-right: auto; }
 @media (max-width: 900px) {
   #leader-panel {
     position: relative;
