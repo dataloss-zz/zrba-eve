@@ -130,6 +130,17 @@ body.session-booting .hero,
 body.session-booting section,
 body.session-booting footer { visibility: hidden; }
 body.session-booting #leader-panel { visibility: visible; }
+body:not(.officer-page) #leaders,
+body:not(.officer-page) #corp-officers { display: none !important; }
+body.officer-page .hero,
+body.officer-page #mission,
+body.officer-page #comms,
+body.officer-page #esi,
+body.officer-page #join { display: none !important; }
+body.officer-page #leaders,
+body.officer-page #corp-officers { padding-top: 1.6rem; padding-bottom: 0.5rem; }
+body.officer-page #corp-officers { padding-bottom: 3rem; }
+
 </style>
 </head>
 <body class="session-booting">
@@ -144,7 +155,7 @@ body.session-booting #leader-panel { visibility: visible; }
     <a href="#comms">Communications</a>
     <a href="#esi">ESI / API</a>
     <a href="#join">Join</a>
-    <a href="#corp-officers" id="corp-officers-link" style="display:none;">Corp Officers</a>
+    <a href="/officers.html" id="corp-officers-link" style="display:none;">Corp Officers</a>
     <a href="#" id="logout-link" style="display:none;">Logout</a>
   </nav>
 </header>
@@ -667,10 +678,7 @@ async function loadCorpOfficers() {
     status.textContent = "Current ESI corporation affiliations checked.";
   } catch (error) { status.textContent = "Could not load: " + error.message; }
 }
-document.getElementById("corp-officers-link").addEventListener("click", () => {
-  document.getElementById("corp-officers").style.display = "block";
-  loadCorpOfficers();
-});
+
 document.getElementById("officers-refresh-btn").addEventListener("click", loadCorpOfficers);
 
 let currentToken = null;
@@ -855,16 +863,20 @@ async function afterLogin(token, opts = {}) {
   const meRes = await fetch("/me", { headers: { Authorization: "Bearer " + token } });
   const me = await meRes.json();
   if (me.is_leader) {
-    document.getElementById("leaders").style.display = "block";
+    if (window.location.pathname === "/officers.html") document.getElementById("leaders").style.display = "block";
     document.getElementById("corp-officers-link").style.display = "inline";
-    if (window.location.hash === "#corp-officers") { document.getElementById("corp-officers").style.display = "block"; await loadCorpOfficers(); }
+
     document.getElementById("leader-welcome").textContent = "Signed in as leader (character " + me.character_id + ").";
     document.getElementById("pending-btn").onclick = () => loadPending("pending");
     document.getElementById("declined-btn").onclick = () => loadPending("declined");
     document.getElementById("apply-status").textContent = "Leader access granted.";
     await loadApplicant(token, { submitApplication: false });
-    await loadPending();
+    if (window.location.pathname === "/officers.html") {
+      document.getElementById("corp-officers").style.display = "block";
+      await Promise.all([loadPending(), loadCorpOfficers()]);
+    }
   } else {
+    if (window.location.pathname === "/officers.html") { window.location.replace("/"); return; }
     // Always refresh the applicant profile and current application decision.
     // loadApplicant checks for an existing application before submitting a new one.
     await loadApplicant(token);
