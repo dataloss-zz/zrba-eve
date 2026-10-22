@@ -454,7 +454,7 @@ async function loadApplicant(token, { submitApplication = true } = {}) {
     <p>Jump fatigue: ${fatigue && fatigue.jump_fatigue_expire_date ? fatigue.jump_fatigue_expire_date : "—"}</p>
     <details style="margin-top:0.6rem;border:1px solid var(--border);border-radius:6px;padding:0.7rem;">
       <summary style="cursor:pointer;font-weight:600;">Corporation history</summary>
-      <ul style="margin-top:0.6rem;">${namedHistory.map(h => `<li>${h.corporation_name || h.corporation_id}<div style="margin-top:0.2rem;color:var(--muted);">— Joined ${h.start_date ? h.start_date.slice(0,10) : "?"}</div></li>`).join("") || "<li>None</li>"}</ul>
+      <ul class="corp-history-list" style="margin-top:0.6rem;">${namedHistory.map(h => `<li>${h.corporation_name || h.corporation_id}<div style="margin-top:0.2rem;color:var(--muted);">— Joined ${h.start_date ? h.start_date.slice(0,10) : "?"}</div></li>`).join("") || "<li>None</li>"}</ul>
     </details>
   `;
   document.getElementById("apply-status").textContent = existingApplication ? "Your application status is shown above your profile." : (submitApplication ? "Submitting your application…" : "Your character profile is shown below.");
@@ -761,7 +761,7 @@ async function showProfile(a, scroll = true) {
       <p>Medals: ${a.medal_count != null ? a.medal_count : "—"}</p>
       <details style="margin-top:0.6rem;border:1px solid var(--border);border-radius:6px;padding:0.7rem;">
         <summary style="cursor:pointer;font-weight:600;">Corporation history</summary>
-        <ul style="margin-top:0.6rem;">${hist.join("") || "<li>None</li>"}</ul>
+        <ul class="corp-history-list" style="margin-top:0.6rem;">${hist.join("") || "<li>None</li>"}</ul>
       </details>
     </div>
   `;
@@ -932,5 +932,32 @@ document.getElementById("public-btn").addEventListener("click", async () => {
 })();
 </script>
 
+
+<style>
+.corp-history-load-more { display:block; margin:0.35rem 0 0 1.4rem; padding:0.15rem 0.5rem; font-size:0.75rem; cursor:pointer; }
+</style>
+<script>
+document.addEventListener("toggle", function(event) {
+  const details = event.target;
+  if (!(details instanceof HTMLDetailsElement) || !details.open) return;
+  const list = details.querySelector(".corp-history-list");
+  if (!list || list.dataset.paged) return;
+  list.dataset.paged = "true";
+  const entries = Array.from(list.children);
+  if (entries.length <= 10) return;
+  let shown = 10;
+  entries.forEach((entry, i) => { entry.hidden = i >= shown; });
+  const button = document.createElement("button");
+  button.type = "button";
+  button.className = "corp-history-load-more";
+  button.textContent = "Load more";
+  list.insertAdjacentElement("afterend", button);
+  button.addEventListener("click", () => {
+    shown += 10;
+    entries.forEach((entry, i) => { entry.hidden = i >= shown; });
+    if (shown >= entries.length) button.remove();
+  });
+}, true);
+</script>
 </body>
 </html>
