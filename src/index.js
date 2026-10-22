@@ -1,5 +1,5 @@
 const CLIENT_ID = "f6080d22aeda4a90a3f20c5906d83037";
-// Add leader character IDs here (as strings). Only these can view applications.
+// Add leader character IDs here (as strings).
 const LEADER_IDS = new Set([
   // "123456789",
 ]);
@@ -20,6 +20,10 @@ function charIdFromToken(token) {
   } catch {
     return null;
   }
+}
+
+function tokenFrom(request) {
+  return (request.headers.get("Authorization") || "").replace(/^Bearer\\s+/i, "");
 }
 
 async function exchangeToken(data) {
@@ -60,11 +64,23 @@ export default {
       }
     }
 
+    if (url.pathname === "/me" && request.method === "GET") {
+      const charId = charIdFromToken(tokenFrom(request));
+      if (!charId) {
+        return new Response(JSON.stringify({ error: "unauthorized" }), {
+          status: 401,
+          headers: { "Content-Type": "application/json", ...cors() },
+        });
+      }
+      return new Response(JSON.stringify({
+        character_id: charId,
+        is_leader: LEADER_IDS.has(charId),
+      }), { headers: { "Content-Type": "application/json", ...cors() } });
+    }
+
     if (url.pathname === "/applications" && request.method === "POST") {
       try {
-        const auth = request.headers.get("Authorization") || "";
-        const token = auth.replace(/^Bearer\s+/i, "");
-        const charId = charIdFromToken(token);
+        const charId = charIdFromToken(tokenFrom(request));
         if (!charId) {
           return new Response(JSON.stringify({ error: "unauthorized" }), {
             status: 401,
@@ -88,9 +104,7 @@ export default {
     }
 
     if (url.pathname === "/applications" && request.method === "GET") {
-      const auth = request.headers.get("Authorization") || "";
-      const token = auth.replace(/^Bearer\s+/i, "");
-      const charId = charIdFromToken(token);
+      const charId = charIdFromToken(tokenFrom(request));
       if (!charId || !LEADER_IDS.has(charId)) {
         return new Response(JSON.stringify({ error: "leaders only" }), {
           status: 403,
