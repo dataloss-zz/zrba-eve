@@ -387,9 +387,16 @@ async function loadApplicant(token) {
       }
       document.getElementById("apply-status").textContent = "Application submitted and pending review.";
     } else {
-      document.getElementById("apply-status").textContent = "Could not submit your application. Please try again.";
+      let detail = "";
+      try {
+        const errorData = await submitRes.json();
+        if (errorData && errorData.error) detail = ": " + errorData.error;
+      } catch (e) {}
+      document.getElementById("apply-status").textContent = "Application submission failed (HTTP " + submitRes.status + ")" + detail + ".";
     }
-  } catch (e) { document.getElementById("apply-status").textContent = "Could not submit your application. Please try again."; }
+  } catch (e) {
+    document.getElementById("apply-status").textContent = "Application submission failed: " + (e && e.message ? e.message : String(e));
+  }
 }
 
 function renderApplicationStatus(application, leaders) {
