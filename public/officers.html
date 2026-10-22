@@ -655,18 +655,19 @@ document.getElementById("logout-link").addEventListener("click", async (e) => {
   window.location.href = "/";
 });
 
-function memberDataHtml(value, depth = 0) {
+function memberDataHtml(value, depth = 0, names = {}, field = "") {
   if (value === null || value === undefined) return '<span style="color:var(--muted);">Not available</span>';
   if (Array.isArray(value)) {
     if (!value.length) return '<span style="color:var(--muted);">None</span>';
     const items = value.map((entry, index) => '<div style="margin:0.35rem 0;padding-left:0.5rem;border-left:1px solid var(--border);">' +
-      (typeof entry === "object" && entry !== null ? memberDataHtml(entry, depth + 1) : memberDataHtml(entry, depth + 1)) + '</div>').join("");
+      (typeof entry === "object" && entry !== null ? memberDataHtml(entry, depth + 1, names, field) : memberDataHtml(entry, depth + 1, names, field)) + '</div>').join("");
     return value.length > 3 ? '<details><summary style="cursor:pointer;">Show ' + value.length + ' entries</summary>' + items + '</details>' : items;
   }
   if (typeof value === "object") {
     return Object.entries(value).map(([key, val]) => '<div style="margin:0.35rem 0;overflow-wrap:anywhere;"><strong>' +
-      escapeHtml(key.replaceAll("_", " ")) + ':</strong> ' + memberDataHtml(val, depth + 1) + '</div>').join("");
+      escapeHtml(key.replaceAll("_", " ")) + ':</strong> ' + memberDataHtml(val, depth + 1, names, key) + '</div>').join("");
   }
+  if (/_id$/i.test(field) && names[String(value)]) return escapeHtml(names[String(value)]);
   return escapeHtml(String(value));
 }
 async function showMemberInfo(id) {
@@ -691,7 +692,7 @@ async function showMemberInfo(id) {
       '<img src="https://images.evetech.net/characters/' + encodeURIComponent(id) + '/portrait?size=128" alt="" style="width:96px;border-radius:6px;">' +
       '<p style="color:var(--muted);font-size:0.85rem;">Public ESI character data and saved website applications. Private character data requires that character’s own authorization.</p>' +
       sections.map(([title, value]) => '<section style="display:block;margin:0.8rem 0;padding:0.8rem;border:1px solid var(--border);border-radius:6px;">' +
-        '<h4>' + escapeHtml(title) + '</h4>' + memberDataHtml(value) + '</section>').join("");
+        '<h4>' + escapeHtml(title) + '</h4>' + memberDataHtml(value, 0, data.names || {}) + '</section>').join("");
   } catch (error) { content.textContent = String(error); }
 }
 document.getElementById("member-info-close").addEventListener("click", () => document.getElementById("member-info-dialog").close());
