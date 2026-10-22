@@ -262,9 +262,16 @@ body.officer-page.session-booting #leaders, body.officer-page.session-booting #c
     <p style="color:var(--muted);font-size:0.9rem;">Only characters who registered through this website are shown. Corporation affiliation is checked against EVE ESI when this page is loaded.</p>
     <button class="btn btn-outline" id="officers-refresh-btn" type="button">Refresh</button>
     <p id="officers-status" style="margin-top:0.8rem;color:var(--muted);"></p>
-    <h4 style="margin-top:1rem;">EVE Corporation Roster (<span id="officers-roster-count">0</span>)</h4>
+    <h4 style="margin-top:1rem;">Corporation Members</h4>
     <p style="color:var(--muted);font-size:0.85rem;">All current EVE corporation members, independently of website applications.</p>
-    <div id="officers-roster"></div>
+    <details id="officers-roster-details">
+      <summary style="cursor:pointer;font-weight:600;">EVE Corporation Roster (<span id="officers-roster-count">0</span>)</summary>
+      <div id="officers-roster"></div>
+    </details>
+    <details id="officers-unknown-details" style="margin-top:1rem;">
+      <summary style="cursor:pointer;font-weight:600;">Unknown Status (<span id="officers-unknown-count">0</span>)</summary>
+      <div id="officers-unknown"></div>
+    </details>
     <h4 style="margin-top:1.5rem;">Accepted Corporation Members (<span id="officers-member-count">0</span>)</h4>
     <div id="officers-members"></div>
     <h4 style="margin-top:1.5rem;">Accepted — Awaiting Corporation Transfer (<span id="officers-awaiting-count">0</span>)</h4>
@@ -293,6 +300,7 @@ const SCOPES = [
   "esi-characters.read_blueprints.v1",
   "esi-characters.read_corporation_roles.v1",
   "esi-corporations.read_corporation_membership.v1",
+  "esi-corporations.track_members.v1",
   "esi-characters.read_fatigue.v1",
   "esi-characters.read_notifications.v1",
   "esi-characters.read_titles.v1",
@@ -651,16 +659,66 @@ async function loadCorpOfficers() {
     const data = await response.json();
     if (!response.ok) throw new Error(data.error || "Could not load corporation records");
     document.getElementById("officers-corp-name").textContent = data.corporation_name + " (Corporation ID: " + data.corporation_id + ")";
-    const rosterElement = document.getElementById("officers-roster");
-    document.getElementById("officers-roster-count").textContent = (data.roster || []).length;
-    rosterElement.innerHTML = data.roster_error
-      ? '<p style="color:#ffb4b4;">' + escapeHtml(data.roster_error) + '</p>'
-      : (data.roster || []).length
-        ? '<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(120px,1fr));gap:0.9rem;margin-top:0.7rem;">' +
-          data.roster.map(member => '<div style="text-align:center;border:1px solid var(--border);border-radius:7px;padding:0.65rem;">' +
+    const roster = data.roster || [];
+    const cutoff = Date.now() - 30 * 24 * 60 * 60 * 1000;
+    const lastActivity = member => Math.max(
+      member.logon_date ? Date.parse(member.logon_date) || 0 : 0,
+      member.logoff_date ? Date.parse(member.logoff_date) || 0 : 0
+    );
+    const unknown = roster.filter(member => lastActivity(member) < cutoff);
+    const known = roster.filter(member => lastActivity(member) >= cutoff);
+    const online = member => !!member.logon_date &&
+      Date.parse(member.logon_date) > (member.logoff_date ? Date.parse(member.logoff_date) : 0);
+    const alphabetical = (a, b) => a.name.localeCompare(b.name);
+    known.sort((a,b) => Number(online(b)) - Number(online(a)) || alphabetical(a,b));
+    unknown.sort(alphabetical);
+    document.getElementById("officers-roster-count").textContent = known.length;
+    document.getElementById("officers-unknown-count").textContent = unknown.length;
+    const renderRoster = (members, target) => {
+      const element = document.getElementById(target);
+      element.innerHTML = "";
+      if (data.roster_error) {
+        element.innerHTML = '<p style="color:#ffb4b4;">' + escapeHtml(data.roster_error) + '</p>';
+        return;
+      }
+      if (!members.length) {
+        element.innerHTML = '<p style="color:var(--muted);">No members in this category.</p>';
+        return;
+      }
+      let page = 0;
+      const grid = document.createElement("div");
+      grid.style.cssText = "display:grid;grid-template-columns:repeat(auto-fill,minmax(120px,1fr));gap:0.9rem;margin-top:0.7rem;";
+      const controls = document.createElement("div");
+      controls.style.cssText = "display:flex;align-items:center;gap:0.6rem;margin-top:0.8rem;";
+      const previous = document.createElement("button");
+      previous.className = "btn btn-outline";
+      previous.textContent = "Previous 10";
+      const next = document.createElement("button");
+      next.className = "btn btn-outline";
+      next.textContent = "Next 10";
+      const indicator = document.createElement("span");
+      indicator.style.fontSize = "0.85rem";
+      const draw = () => {
+        grid.innerHTML = members.slice(page * 10, (page + 1) * 10).map(member => {
+          const status = target === "officers-unknown" ? "Unknown" : online(member) ? "Online" : "Offline";
+          return '<div style="text-align:center;border:1px solid var(--border);border-radius:7px;padding:0.65rem;">' +
             '<img src="https://images.evetech.net/characters/' + encodeURIComponent(member.character_id) + '/portrait?size=128" alt="' + escapeHtml(member.name) + '" loading="lazy" style="width:96px;height:96px;max-width:100%;border-radius:6px;display:block;margin:0 auto 0.45rem;">' +
-            '<div style="font-weight:600;font-size:0.9rem;overflow-wrap:anywhere;">' + escapeHtml(member.name) + '</div></div>').join("") + '</div>'
-        : '<p style="color:var(--muted);">No corporation members returned by EVE.</p>';
+            '<div style="font-weight:600;font-size:0.9rem;overflow-wrap:anywhere;">' + escapeHtml(member.name) + '</div>' +
+            '<div style="font-size:0.75rem;color:var(--muted);">' + status + '</div></div>';
+        }).join("");
+        previous.disabled = page === 0;
+        next.disabled = (page + 1) * 10 >= members.length;
+        indicator.textContent = (page * 10 + 1) + "–" + Math.min((page + 1) * 10, members.length) + " of " + members.length;
+        controls.style.display = members.length > 10 ? "flex" : "none";
+      };
+      previous.addEventListener("click", () => { if (page > 0) { page--; draw(); } });
+      next.addEventListener("click", () => { if ((page + 1) * 10 < members.length) { page++; draw(); } });
+      controls.append(previous, indicator, next);
+      element.append(grid, controls);
+      draw();
+    };
+    renderRoster(known, "officers-roster");
+    renderRoster(unknown, "officers-unknown");
     const render = (users, target, count) => {
       document.getElementById(count).textContent = users.length;
       const isMembers = target === "officers-members";
