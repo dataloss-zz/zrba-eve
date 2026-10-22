@@ -408,38 +408,58 @@ function renderApplicationStatus(application, leaders) {
     box.innerHTML = '<p style="border:1px solid #347b53; padding:0.8rem; border-radius:6px; color:#8fe0ad;"><strong>Application Status: Accepted</strong></p>';
   } else if (application.status === "declined") {
     const availableLeaders = leaders.map(l => typeof l === "string" ? { id: "", name: l } : l);
+    const existingDiscussion = application.discussion;
     box.innerHTML = '<div style="border:1px solid #9b4242; padding:0.8rem; border-radius:6px;">' +
       '<p style="color:#ff9b9b;"><strong>Application Status: Declined</strong></p>' +
-      '<p style="margin:0.5rem 0;">If you spoke with a recruitment leader, briefly summarize the discussion below.</p>' +
-      '<textarea id="discussion-summary" maxlength="1000" rows="4" placeholder="Briefly summarize your discussion (maximum 1000 characters)" style="width:100%;padding:0.6rem;background:var(--bg);color:var(--text);border:1px solid var(--border);border-radius:5px;">' + escapeHtml(application.discussion?.summary || "") + '</textarea>' +
-      '<p style="margin:0.5rem 0;">Select the leader you spoke with to save your summary:</p>' +
+      '<p style="margin:0.5rem 0;">Summarize your conversation with a recruitment leader and select who you spoke with.</p>' +
+      '<textarea id="discussion-summary" maxlength="1000" rows="4" placeholder="Brief summary (maximum 1000 characters)" style="width:100%;padding:0.6rem;background:var(--bg);color:var(--text);border:1px solid var(--border);border-radius:5px;">' + escapeHtml(existingDiscussion?.summary || "") + '</textarea>' +
+      '<p style="margin:0.5rem 0;">Leader you spoke with:</p>' +
       '<div id="discussion-leaders" style="display:flex;gap:0.5rem;flex-wrap:wrap;"></div>' +
+      '<button class="btn" id="submit-discussion" style="margin-top:0.8rem;">Submit summary</button>' +
       '<p id="discussion-status" style="margin-top:0.5rem;color:var(--muted);"></p></div>';
+    let selectedLeaderId = existingDiscussion?.leader_id || "";
     const buttons = document.getElementById("discussion-leaders");
+    const leaderButtons = [];
+    const refreshSelection = () => {
+      leaderButtons.forEach(button => {
+        const selected = button.dataset.leaderId === selectedLeaderId;
+        button.style.background = selected ? "var(--accent)" : "transparent";
+        button.style.color = selected ? "#0a0c12" : "var(--accent)";
+        button.setAttribute("aria-pressed", String(selected));
+      });
+    };
     availableLeaders.forEach(leader => {
       if (!leader.id) return;
       const button = document.createElement("button");
       button.className = "btn";
-      button.style.cssText = "font-size:0.85rem;padding:0.35rem 0.75rem;";
+      button.type = "button";
+      button.dataset.leaderId = leader.id;
+      button.style.cssText = "font-size:0.85rem;padding:0.35rem 0.75rem;border:1px solid var(--accent);";
       button.textContent = leader.name;
-      button.onclick = async () => {
-        const summary = document.getElementById("discussion-summary").value.trim();
-        const message = document.getElementById("discussion-status");
-        if (!summary) { message.textContent = "Enter a summary first."; return; }
-        message.textContent = "Saving…";
-        try {
-          const response = await fetch("/application-discussion", {
-            method: "POST",
-            headers: { "Content-Type": "application/json", Authorization: "Bearer " + currentToken },
-            body: JSON.stringify({ summary, leader_id: leader.id })
-          });
-          const result = await response.json();
-          if (!response.ok) throw new Error(result.error || "Save failed");
-          message.textContent = "Discussion with " + leader.name + " saved.";
-        } catch (error) { message.textContent = "Could not save: " + error.message; }
-      };
+      button.onclick = () => { selectedLeaderId = leader.id; refreshSelection(); };
       buttons.appendChild(button);
+      leaderButtons.push(button);
     });
+    refreshSelection();
+    const message = document.getElementById("discussion-status");
+    if (existingDiscussion) message.textContent = "Summary submitted. You may update it while the application remains declined.";
+    document.getElementById("submit-discussion").onclick = async () => {
+      const summary = document.getElementById("discussion-summary").value.trim();
+      if (!summary) { message.textContent = "Enter a summary first."; return; }
+      if (!selectedLeaderId) { message.textContent = "Select the leader you spoke with."; return; }
+      message.textContent = "Submitting summary…";
+      try {
+        const response = await fetch("/application-discussion", {
+          method: "POST",
+          headers: { "Content-Type": "application/json", Authorization: "Bearer " + currentToken },
+          body: JSON.stringify({ summary, leader_id: selectedLeaderId })
+        });
+        const result = await response.json();
+        if (!response.ok) throw new Error(result.error || "Submission failed");
+        application.discussion = result.discussion;
+        message.textContent = "Summary submitted successfully. A leader can now return your application to pending review.";
+      } catch (error) { message.textContent = "Could not submit: " + error.message; }
+    };
   } else {
     box.innerHTML = '<p style="border:1px solid var(--border); padding:0.8rem; border-radius:6px;"><strong>Application Status: Pending review</strong></p>';
   }
@@ -502,7 +522,7 @@ async function showProfile(a) {
     <div class="card">
       <img src="${a.portrait || ""}" alt="" style="border-radius:6px; width:96px; height:96px; display:block;">
       <div style="display:flex; gap:0.6rem; margin:0.6rem 0 1rem;">
-        ${declined ? '<button class="btn" id="review-application-btn">Review — return to pending</button>' : '<button class="btn" id="accept-application-btn" style="background:#347b53;color:#fff;">Accept</button><button class="btn" id="decline-application-btn" style="background:#9b4242;color:#fff;">Decline</button>'}
+        ${declined ? (a.discussion?.summary ? '<button class="btn" id="review-application-btn">Review — return to pending</button>' : '<p>Waiting for the applicant to submit their discussion summary before review is available.</p>') : '<button class="btn" id="accept-application-btn" style="background:#347b53;color:#fff;">Accept</button><button class="btn" id="decline-application-btn" style="background:#9b4242;color:#fff;">Decline</button>'}
       </div>
       <h4 style="margin-top:0.6rem;">${a.name}</h4>
       <p>Character ID: ${a.character_id}</p>
@@ -510,7 +530,7 @@ async function showProfile(a) {
       <p>Security: ${a.security_status != null ? Number(a.security_status).toFixed(2) : "—"}</p>
       <p>Birthday: ${a.birthday ? String(a.birthday).slice(0,10) : "—"}</p>
       <p>Submitted: ${a.submitted_at || "—"}</p>
-      ${a.discussion ? `<p><strong>Applicant discussion with ${escapeHtml(a.discussion.leader_name || "")}:</strong> ${escapeHtml(a.discussion.summary || "")}</p>` : ""}
+      ${declined ? `<details style="margin:0.8rem 0;border:1px solid var(--border);border-radius:6px;padding:0.7rem;"><summary style="cursor:pointer;font-weight:600;">Applicant discussion summary ${a.discussion ? "— submitted" : "— awaiting submission"}</summary><div style="margin-top:0.6rem;">${a.discussion ? `<p><strong>Leader selected:</strong> ${escapeHtml(a.discussion.leader_name || "")}</p><p style="white-space:pre-wrap;">${escapeHtml(a.discussion.summary || "")}</p><p><strong>Submitted:</strong> ${escapeHtml(a.discussion.updated_at || "—")}</p>` : "<p>No discussion summary submitted yet.</p>"}</div></details>` : (a.discussion ? `<p><strong>Applicant discussion with ${escapeHtml(a.discussion.leader_name || "")}:</strong> ${escapeHtml(a.discussion.summary || "")}</p>` : "")}
       ${a.review_history?.length ? `<p><strong>Review history:</strong> ${a.review_history.map(r => escapeHtml(r.leader_name || r.leader_id) + " — " + escapeHtml(r.reviewed_at)).join("; ")}</p>` : ""}
       <p>Recent killmails: ${a.killmail_count != null ? a.killmail_count : "—"}</p>
       <p>Contacts: ${a.contact_count != null ? a.contact_count : "—"}</p>
