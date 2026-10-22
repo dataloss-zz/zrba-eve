@@ -313,6 +313,29 @@ export default {
       }
     }
 
+    if (url.pathname === "/corp-officers/remove" && request.method === "POST") {
+      const viewerId = await charIdFromToken(tokenFrom(request));
+      if (!viewerId || !LEADER_IDS.has(viewerId)) return Response.json({ error: "leaders only" }, { status: 403 });
+      try {
+        const body = await request.json();
+        const characterId = String(body.character_id || "");
+        if (!/^[0-9]+$/.test(characterId)) return Response.json({ error: "Invalid character ID" }, { status: 400 });
+        if (LEADER_IDS.has(characterId)) return Response.json({ error: "Cannot remove a configured recruitment leader" }, { status: 403 });
+        const keys = [];
+        let cursor;
+        do {
+          const page = await env.APPLICATIONS.list({ prefix: "app:" + characterId + ":", cursor });
+          keys.push(...page.keys.map(item => item.name));
+          cursor = page.list_complete ? undefined : page.cursor;
+        } while (cursor);
+        if (!keys.length) return Response.json({ error: "No registered application found" }, { status: 404 });
+        await Promise.all(keys.map(key => env.APPLICATIONS.delete(key)));
+        return Response.json({ ok: true, removed_applications: keys.length });
+      } catch (error) {
+        return Response.json({ error: String(error) }, { status: 500 });
+      }
+    }
+
     if (url.pathname === "/corp-officers" && request.method === "GET") {
       const viewerId = await charIdFromToken(tokenFrom(request));
       if (!viewerId || !LEADER_IDS.has(viewerId)) {
