@@ -36,28 +36,29 @@ async function getJwks() {
   return jwksCache;
 }
 
-async function charIdFromToken(token) {
+async function charIdFromToken(token, diagnostic = null) {
+  const reject = (reason) => { if (diagnostic) diagnostic.reason = reason; return null; };
   try {
-    if (typeof token !== "string") return null;
+    if (typeof token !== "string") return reject("missing token");
     const parts = token.split(".");
-    if (parts.length !== 3) return null;
+    if (parts.length !== 3) return reject("invalid token format");
     const header = JSON.parse(decodeBase64Url(parts[0]));
     const claims = JSON.parse(decodeBase64Url(parts[1]));
-    if (header.alg !== "RS256" || typeof header.kid !== "string") return null;
+    if (header.alg !== "RS256" || typeof header.kid !== "string") return reject("unsupported token signing algorithm");
 
     const now = Math.floor(Date.now() / 1000);
-    if (!Number.isFinite(claims.exp) || claims.exp <= now) return null;
-    if (!["https://login.eveonline.com/", "login.eveonline.com"].includes(claims.iss)) return null;
+    if (!Number.isFinite(claims.exp) || claims.exp <= now) return reject("expired token");
+    if (!["https://login.eveonline.com/", "https://login.eveonline.com", "login.eveonline.com"].includes(claims.iss)) return reject("unexpected token issuer");
     const audiences = Array.isArray(claims.aud) ? claims.aud : [claims.aud];
-    if (!audiences.includes(CLIENT_ID)) return null;
-    if (typeof claims.sub !== "string" || !/^CHARACTER:EVE:\d+$/.test(claims.sub)) return null;
+    if (!audiences.includes(CLIENT_ID)) return reject("token audience mismatch");
+    if (typeof claims.sub !== "string" || !/^CHARACTER:EVE:\d+$/.test(claims.sub)) return reject("invalid character identity");
 
     const jwks = await getJwks();
     const jwk = jwks.keys.find(key => key.kid === header.kid && key.alg === "RS256" && key.kty === "RSA");
     if (!jwk) {
       jwksCache = null;
       jwksCacheExpiresAt = 0;
-      return null;
+      return reject("signing key not found");
     }
     const publicKey = await crypto.subtle.importKey(
       "jwk",
@@ -69,9 +70,9 @@ async function charIdFromToken(token) {
     const signature = Uint8Array.from(decodeBase64Url(parts[2]), ch => ch.charCodeAt(0));
     const signedData = new TextEncoder().encode(parts[0] + "." + parts[1]);
     const validSignature = await crypto.subtle.verify("RSASSA-PKCS1-v1_5", publicKey, signature, signedData);
-    return validSignature ? claims.sub.split(":").pop() : null;
+    return validSignature ? claims.sub.split(":").pop() : reject("invalid token signature");
   } catch {
-    return null;
+    return reject("token verification error");
   }
 }
 
@@ -133,9 +134,10 @@ export default {
 
     if (url.pathname === "/applications" && request.method === "POST") {
       try {
-        const charId = await charIdFromToken(tokenFrom(request));
+        const diagnostic = {};
+        const charId = await charIdFromToken(tokenFrom(request), diagnostic);
         if (!charId) {
-          return new Response(JSON.stringify({ error: "unauthorized" }), {
+          return new Response(JSON.stringify({ error: "unauthorized: " + (diagnostic.reason || "token rejected") }), {
             status: 401,
             headers: { "Content-Type": "application/json", ...cors() },
           });
