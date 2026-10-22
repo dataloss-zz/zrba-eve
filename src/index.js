@@ -89,6 +89,9 @@ export default {
         const profile = await request.json();
         profile.character_id = charId;
         profile.submitted_at = new Date().toISOString();
+        profile.status = "pending";
+        profile.decided_at = null;
+        profile.decided_by = null;
         const key = `app:${charId}:${Date.now()}`;
         await env.APPLICATIONS.put(key, JSON.stringify(profile));
         return new Response(JSON.stringify({ ok: true, key }), {
@@ -98,6 +101,56 @@ export default {
         return new Response(JSON.stringify({ error: String(err) }), {
           status: 400,
           headers: { "Content-Type": "application/json", ...cors() },
+        });
+      }
+    }
+
+    if (url.pathname === "/application-status" && request.method === "GET") {
+      const charId = charIdFromToken(tokenFrom(request));
+      if (!charId) return new Response(JSON.stringify({ error: "unauthorized" }), {
+        status: 401, headers: { "Content-Type": "application/json", ...cors() },
+      });
+      const list = await env.APPLICATIONS.list({ prefix: `app:${charId}:` });
+      const apps = [];
+      for (const k of list.keys) {
+        const value = await env.APPLICATIONS.get(k.name);
+        if (value) apps.push({ ...JSON.parse(value), application_key: k.name });
+      }
+      apps.sort((a, b) => (b.submitted_at || "").localeCompare(a.submitted_at || ""));
+      return new Response(JSON.stringify({
+        application: apps[0] || null,
+        recruitment_leaders: ["datalost"],
+      }), { headers: { "Content-Type": "application/json", ...cors() } });
+    }
+
+    if (url.pathname === "/application-decision" && request.method === "POST") {
+      const charId = charIdFromToken(tokenFrom(request));
+      if (!charId || !LEADER_IDS.has(charId)) return new Response(JSON.stringify({ error: "leaders only" }), {
+        status: 403, headers: { "Content-Type": "application/json", ...cors() },
+      });
+      try {
+        const body = await request.json();
+        if (!body || !["accepted", "declined"].includes(body.status) ||
+            typeof body.application_key !== "string" || !body.application_key.startsWith("app:")) {
+          return new Response(JSON.stringify({ error: "invalid decision" }), {
+            status: 400, headers: { "Content-Type": "application/json", ...cors() },
+          });
+        }
+        const existing = await env.APPLICATIONS.get(body.application_key);
+        if (!existing) return new Response(JSON.stringify({ error: "application not found" }), {
+          status: 404, headers: { "Content-Type": "application/json", ...cors() },
+        });
+        const application = JSON.parse(existing);
+        application.status = body.status;
+        application.decided_at = new Date().toISOString();
+        application.decided_by = charId;
+        await env.APPLICATIONS.put(body.application_key, JSON.stringify(application));
+        return new Response(JSON.stringify({ ok: true, status: application.status }), {
+          headers: { "Content-Type": "application/json", ...cors() },
+        });
+      } catch (err) {
+        return new Response(JSON.stringify({ error: String(err) }), {
+          status: 400, headers: { "Content-Type": "application/json", ...cors() },
         });
       }
     }
@@ -114,7 +167,7 @@ export default {
       const apps = [];
       for (const k of list.keys) {
         const val = await env.APPLICATIONS.get(k.name);
-        if (val) apps.push(JSON.parse(val));
+        if (val) apps.push({ ...JSON.parse(val), application_key: k.name });
       }
       const latest = new Map();
       for (const a of apps) {
@@ -122,7 +175,7 @@ export default {
         const prev = latest.get(id);
         if (!prev || (a.submitted_at || "") > (prev.submitted_at || "")) latest.set(id, a);
       }
-      const unique = [...latest.values()].sort((a, b) => (b.submitted_at || "").localeCompare(a.submitted_at || ""));
+      const unique = [...latest.values()].filter(a => (a.status || "pending") === "pending").sort((a, b) => (b.submitted_at || "").localeCompare(a.submitted_at || ""));
       return new Response(JSON.stringify(unique), {
         headers: { "Content-Type": "application/json", ...cors() },
       });
