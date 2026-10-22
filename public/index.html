@@ -264,6 +264,43 @@ async function exchangeCode(code) {
   return res.json();
 }
 
+const nativeFetch = window.fetch.bind(window);
+window.fetch = async (input, init = {}) => {
+  const url = typeof input === "string" ? input : input instanceof Request ? input.url : String(input);
+  const target = new URL(url, window.location.href);
+  const headers = new Headers(init.headers || (input instanceof Request ? input.headers : undefined));
+  if (target.origin === window.location.origin && headers.has("Authorization") &&
+      !["/refresh", "/exchange", "/logout"].includes(target.pathname)) {
+    const token = await ensureFreshToken();
+    headers.set("Authorization", "Bearer " + token);
+    init = { ...init, headers };
+  }
+  return nativeFetch(input, init);
+};
+const SESSION_SCOPES_KEY = "eve_authorized_scopes";
+async function refreshSession() {
+  const response = await fetch("/refresh", { method: "POST", credentials: "same-origin" });
+  if (!response.ok) return null;
+  const data = await response.json();
+  return data.access_token || null;
+}
+function scopesNeedAuthorization(token) {
+  const claims = parseJwt(token);
+  const granted = grantedScopes(claims);
+  return SCOPES.split(" ").some(scope => scope !== "publicData" && !granted.has(scope));
+}
+function sessionExpiryMs(token) {
+  try { return Number(parseJwt(token).exp) * 1000; } catch { return 0; }
+}
+async function ensureFreshToken() {
+  if (currentToken && sessionExpiryMs(currentToken) > Date.now() + 90000) return currentToken;
+  const refreshed = await refreshSession();
+  if (!refreshed) throw new Error("Your EVE session has expired. Please log in again.");
+  if (scopesNeedAuthorization(refreshed)) throw new Error("ESI permissions changed. Please log in again to authorize the requested scopes.");
+  currentToken = refreshed;
+  sessionStorage.setItem("access_token", refreshed);
+  return refreshed;
+}
 function parseJwt(token) {
   const payload = token.split(".")[1];
   return JSON.parse(atob(payload.replace(/-/g, "+").replace(/_/g, "/")));
@@ -505,10 +542,11 @@ document.querySelectorAll("button").forEach(button => {
 });
 document.getElementById("apply-btn").addEventListener("click", startLogin);
 document.getElementById("sso-btn").addEventListener("click", startLogin);
-document.getElementById("logout-link").addEventListener("click", (e) => {
+document.getElementById("logout-link").addEventListener("click", async (e) => {
   e.preventDefault();
   sessionStorage.removeItem("access_token");
   sessionStorage.removeItem("pkce_verifier");
+  await fetch("/logout", { method: "POST", credentials: "same-origin" }).catch(() => {});
   window.location.href = "/";
 });
 
@@ -635,6 +673,10 @@ function setLoggedIn(on) {
 }
 
 async function afterLogin(token, opts = {}) {
+  if (scopesNeedAuthorization(token)) {
+    sessionStorage.removeItem("access_token");
+    throw new Error("ESI permissions changed. Please log in again to authorize the requested scopes.");
+  }
   currentToken = token;
   sessionStorage.setItem("access_token", token);
   setLoggedIn(true);
@@ -681,12 +723,12 @@ document.getElementById("public-btn").addEventListener("click", async () => {
     return;
   }
   const saved = sessionStorage.getItem("access_token");
-  if (saved) {
-    try {
-      await afterLogin(saved, { skipSubmit: true });
-    } catch (e) {
-      sessionStorage.removeItem("access_token");
-    }
+  try {
+    const token = saved && sessionExpiryMs(saved) > Date.now() + 90000 ? saved : await refreshSession();
+    if (token) await afterLogin(token, { skipSubmit: true });
+  } catch (e) {
+    sessionStorage.removeItem("access_token");
+    document.getElementById("apply-status").textContent = e.message || "Please log in again.";
   }
 })();
 </script>
