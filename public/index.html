@@ -623,11 +623,34 @@ async function loadCorpOfficers() {
       document.getElementById(count).textContent = users.length;
       document.getElementById(target).innerHTML = users.length
         ? '<ul style="padding-left:1.4rem;">' + users.sort((a,b) => a.name.localeCompare(b.name)).map(user =>
-            '<li>' + escapeHtml(user.name) + ' <span style="color:var(--muted);font-size:0.85rem;">(' + escapeHtml(user.character_id) + ')</span></li>').join("") + '</ul>'
+            '<li style="margin:0.45rem 0;">' + escapeHtml(user.name) + ' <span style="color:var(--muted);font-size:0.85rem;">(' + escapeHtml(user.character_id) + ')</span> <button type="button" class="remove-member-btn" data-character-id="' + user.character_id + '" data-character-name="' + escapeHtml(user.name) + '" style="font-size:0.72rem;padding:0.2rem 0.45rem;margin-left:0.5rem;background:transparent;color:#ff9c9c;border:1px solid #a45a5a;border-radius:4px;cursor:pointer;">Remove from Corp</button></li>').join("") + '</ul>'
         : '<p style="color:var(--muted);">No registered characters in this category.</p>';
     };
     render(data.members, "officers-members", "officers-member-count");
     render(data.awaiting_transfer, "officers-awaiting", "officers-awaiting-count");
+    document.querySelectorAll("#officers-members .remove-member-btn, #officers-awaiting .remove-member-btn").forEach(button => {
+      button.addEventListener("click", async () => {
+        const characterId = button.dataset.characterId;
+        const name = button.dataset.characterName;
+        if (!window.confirm("Remove " + name + " from the website's corporation roster and delete all their applications? They must apply again from scratch. This does NOT remove them from the EVE Online corporation.")) return;
+        button.disabled = true;
+        status.textContent = "Removing " + name + "…";
+        try {
+          const result = await fetch("/corp-officers/remove", {
+            method: "POST",
+            headers: { "Content-Type": "application/json", Authorization: "Bearer " + currentToken },
+            body: JSON.stringify({ character_id: characterId })
+          });
+          const data = await result.json();
+          if (!result.ok) throw new Error(data.error || "Removal failed");
+          await loadCorpOfficers();
+          document.getElementById("officers-status").textContent = name + " removed from website records. A new application is required.";
+        } catch (error) {
+          status.textContent = "Removal failed: " + error.message;
+          button.disabled = false;
+        }
+      });
+    });
     status.textContent = "Current ESI corporation affiliations checked.";
   } catch (error) { status.textContent = "Could not load: " + error.message; }
 }
