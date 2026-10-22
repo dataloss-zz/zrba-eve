@@ -453,12 +453,20 @@ export default {
           } else {
             const ids = await membershipResponse.json();
             if (!Array.isArray(ids)) throw new Error("Invalid corporation roster response");
+            const trackingResponse = await fetch("https://esi.evetech.net/latest/corporations/" + corporationId + "/membertracking/?datasource=tranquility", {
+              headers: { Authorization: "Bearer " + tokenFrom(request) }
+            });
+            if (!trackingResponse.ok) {
+              roster_error = "Online status unavailable (HTTP " + trackingResponse.status + "). A Director must authorize corporation member tracking.";
+            }
+            const tracking = trackingResponse.ok ? await trackingResponse.json() : [];
+            const trackingById = new Map(Array.isArray(tracking) ? tracking.map(entry => [entry.character_id, entry]) : []);
             roster = (await Promise.all(ids.map(async id => {
               try {
                 const response = await fetch("https://esi.evetech.net/latest/characters/" + id + "/?datasource=tranquility");
-                if (!response.ok) return { character_id: id, name: String(id) };
+                if (!response.ok) return { character_id: id, name: String(id), ...trackingById.get(id) };
                 const character = await response.json();
-                return { character_id: id, name: character.name || String(id) };
+                return { character_id: id, name: character.name || String(id), ...trackingById.get(id) };
               } catch { return { character_id: id, name: String(id) }; }
             }))).sort((a, b) => a.name.localeCompare(b.name));
           }
