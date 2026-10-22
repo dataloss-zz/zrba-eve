@@ -1,15 +1,21 @@
 # Zeta Reticuli Blackpill Alliance
 
-EVE Online corporation site with ESI (EVE Swagger Interface) login.
+EVE Online corporation site with ESI login.
 
-## Files
-- index.html – the site
-- server.py – local server for SSO token exchange (avoids CORS)
+Live: https://zrba-eve.dataloss.workers.dev/
 
-## Local run
-1. python3 server.py
-2. Open http://localhost:8080/
-3. Set ESI Callback URL to http://localhost:8080/callback
+## Deploy (Cloudflare Workers)
 
-## Cloudflare Pages
-Connect this repo to Cloudflare Pages. The login token exchange needs a Worker (not included yet).
+1. Install Wrangler: `npm i -g wrangler`
+2. `wrangler login`
+3. `wrangler deploy`
+
+## ESI Callback URL
+
+Set this in your EVE developer app:
+
+https://zrba-eve.dataloss.workers.dev/callback
+
+## Local
+
+`wrangler dev`
