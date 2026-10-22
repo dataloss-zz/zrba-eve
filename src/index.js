@@ -79,6 +79,37 @@ function tokenFrom(request) {
   return (request.headers.get("Authorization") || "").replace(/^Bearer\s+/i, "");
 }
 
+const SESSION_SECONDS = 24 * 60 * 60;
+function refreshCookie(token) {
+  return "eve_refresh=" + encodeURIComponent(token) + "; HttpOnly; Secure; SameSite=Strict; Path=/; Max-Age=" + SESSION_SECONDS;
+}
+function clearRefreshCookie() {
+  return "eve_refresh=; HttpOnly; Secure; SameSite=Strict; Path=/; Max-Age=0";
+}
+function refreshFromCookie(request) {
+  const match = (request.headers.get("Cookie") || "").match(/(?:^|;\\s*)eve_refresh=([^;]*)/);
+  try { return match ? decodeURIComponent(match[1]) : null; } catch { return null; }
+}
+function sameOriginRequest(request) {
+  const origin = request.headers.get("Origin");
+  return origin === new URL(request.url).origin;
+}
+async function refreshToken(request) {
+  if (!sameOriginRequest(request)) return new Response(JSON.stringify({ error: "invalid origin" }), { status: 403, headers: { "Content-Type": "application/json" } });
+  const refreshTokenValue = refreshFromCookie(request);
+  if (!refreshTokenValue) return new Response(JSON.stringify({ error: "session expired" }), { status: 401, headers: { "Content-Type": "application/json" } });
+  const form = new URLSearchParams({ grant_type: "refresh_token", refresh_token: refreshTokenValue, client_id: CLIENT_ID });
+  const result = await fetch("https://login.eveonline.com/v2/oauth/token", { method: "POST", headers: { "Content-Type": "application/x-www-form-urlencoded" }, body: form });
+  const payload = await result.json();
+  const headers = { "Content-Type": "application/json", "Cache-Control": "no-store" };
+  if (!result.ok || !payload.access_token || !payload.refresh_token) {
+    headers["Set-Cookie"] = clearRefreshCookie();
+    return new Response(JSON.stringify({ error: "session expired; sign in again" }), { status: 401, headers });
+  }
+  headers["Set-Cookie"] = refreshCookie(payload.refresh_token);
+  return new Response(JSON.stringify({ access_token: payload.access_token, expires_in: payload.expires_in }), { headers });
+}
+
 async function exchangeToken(data) {
   const form = new URLSearchParams({
     grant_type: "authorization_code",
@@ -92,10 +123,14 @@ async function exchangeToken(data) {
     body: form,
   });
   const body = await tokenRes.text();
-  return new Response(body, {
-    status: tokenRes.status,
-    headers: { "Content-Type": "application/json", ...cors() },
-  });
+  let payload;
+  try { payload = JSON.parse(body); } catch { payload = null; }
+  const headers = { "Content-Type": "application/json", "Cache-Control": "no-store", ...cors() };
+  if (tokenRes.ok && payload?.refresh_token) {
+    headers["Set-Cookie"] = refreshCookie(payload.refresh_token);
+    delete payload.refresh_token;
+  }
+  return new Response(payload ? JSON.stringify(payload) : body, { status: tokenRes.status, headers });
 }
 
 export default {
@@ -104,6 +139,15 @@ export default {
 
     if (request.method === "OPTIONS") {
       return new Response(null, { status: 204, headers: cors() });
+    }
+
+    if (url.pathname === "/refresh" && request.method === "POST") {
+      try { return await refreshToken(request); }
+      catch { return new Response(JSON.stringify({ error: "refresh unavailable" }), { status: 503, headers: { "Content-Type": "application/json" } }); }
+    }
+    if (url.pathname === "/logout" && request.method === "POST") {
+      if (!sameOriginRequest(request)) return new Response(null, { status: 403 });
+      return new Response(JSON.stringify({ ok: true }), { headers: { "Content-Type": "application/json", "Set-Cookie": clearRefreshCookie() } });
     }
 
     if (url.pathname === "/exchange" && request.method === "POST") {
