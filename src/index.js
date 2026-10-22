@@ -428,8 +428,32 @@ export default {
           try { const raw = await env.APPLICATIONS.get(key.name); return raw ? JSON.parse(raw) : null; }
           catch { return null; }
         }))).filter(Boolean);
+        const names = {};
+        const ids = new Set();
+        const visit = (value, key = "") => {
+          if (Array.isArray(value)) { value.forEach(item => visit(item, key)); return; }
+          if (value && typeof value === "object") {
+            for (const [field, entry] of Object.entries(value)) visit(entry, field);
+            return;
+          }
+          if (/^(corporation_id|alliance_id|faction_id|character_id|leader_id|reviewer_id|ceo_id|creator_id)$/i.test(key) && Number.isSafeInteger(Number(value)) && Number(value) > 0) ids.add(Number(value));
+        };
+        visit(character); visit(history); visit(applications);
+        const lookup = async (id, kind) => {
+          try {
+            const r = await fetch("https://esi.evetech.net/latest/" + kind + "/" + id + "/");
+            if (r.ok) { const info = await r.json(); return info.name || null; }
+          } catch {}
+          return null;
+        };
+        await Promise.all([...ids].map(async id => {
+          const kind = id === character.corporation_id || (Array.isArray(history) && history.some(h => h.corporation_id === id)) ? "corporations" :
+            id === character.alliance_id ? "alliances" : "characters";
+          const name = await lookup(id, kind);
+          if (name) names[String(id)] = name;
+        }));
         const safeApplications = applications.map(({ access_token, refresh_token, ...record }) => record);
-        return Response.json({ character, portrait, corporation_history: history || [], applications: safeApplications }, { headers: { "Cache-Control": "no-store" } });
+        return Response.json({ character, portrait, corporation_history: history || [], applications: safeApplications, names }, { headers: { "Cache-Control": "no-store" } });
       } catch (error) { return Response.json({ error: String(error) }, { status: 502 }); }
     }
 
