@@ -1,0 +1,931 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Zeta Reticuli Blackpill Alliance | EVE Online Corporation</title>
+<meta name="description" content="Zeta Reticuli Blackpill Alliance – EVE Online corporation. Mission, communications, and ESI-powered tools.">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>◈</text></svg>">
+<style>
+:root {
+  --bg: #0a0c12;
+  --panel: #12151e;
+  --accent: #c9a227;
+  --accent2: #4da6ff;
+  --text: #e8e6e3;
+  --muted: #8a8f99;
+  --border: #2a2f3a;
+}
+* { box-sizing: border-box; margin: 0; padding: 0; }
+body {
+  font-family: "Segoe UI", system-ui, sans-serif;
+  background: var(--bg);
+  color: var(--text);
+  line-height: 1.6;
+  background-image: radial-gradient(ellipse at top, #1a1f2e 0%, var(--bg) 70%);
+}
+a { color: var(--accent2); text-decoration: none; }
+a:hover { text-decoration: underline; }
+header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 1.2rem 5%;
+  border-bottom: 1px solid var(--border);
+  background: rgba(10,12,18,0.9);
+  position: sticky;
+  top: 0;
+  z-index: 10;
+}
+.logo-area { display: flex; align-items: center; gap: 1rem; }
+.logo {
+  width: 56px; height: 56px;
+  background: linear-gradient(135deg, var(--accent), #8b6914);
+  border-radius: 8px;
+  display: grid; place-items: center;
+  font-size: 0.95rem; letter-spacing: -0.02em; font-weight: 700; color: #0a0c12;
+}
+h1 { font-size: 1.4rem; letter-spacing: 0.05em; }
+h1 span { color: var(--accent); }
+nav a { margin-left: 1.5rem; color: var(--muted); font-size: 0.95rem; }
+nav a:hover { color: var(--accent); }
+.hero {
+  text-align: center;
+  padding: 4rem 5% 3rem;
+}
+.hero h2 { font-size: 2.4rem; margin-bottom: 0.5rem; }
+.hero p { color: var(--muted); max-width: 640px; margin: 0 auto 1.5rem; }
+.btn {
+  display: inline-block;
+  background: var(--accent);
+  color: #0a0c12;
+  padding: 0.7rem 1.6rem;
+  border-radius: 4px;
+  font-weight: 600;
+  border: none;
+  cursor: pointer;
+  font-size: 1rem;
+}
+.btn:hover { filter: brightness(1.1); text-decoration: none; }
+.btn-outline {
+  background: transparent;
+  border: 1px solid var(--accent2);
+  color: var(--accent2);
+  margin-left: 0.6rem;
+}
+section { padding: 3.5rem 5%; max-width: 1100px; margin: 0 auto; }
+h3 { font-size: 1.6rem; margin-bottom: 1rem; color: var(--accent); }
+.grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 1.5rem; }
+.card {
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 1.4rem;
+}
+.card h4 { margin-bottom: 0.5rem; }
+.card p, .card li { color: var(--muted); font-size: 0.95rem; }
+ul { padding-left: 1.2rem; }
+footer {
+  text-align: center;
+  padding: 2rem;
+  color: var(--muted);
+  font-size: 0.85rem;
+  border-top: 1px solid var(--border);
+  margin-top: 2rem;
+}
+#esi-status { margin-top: 1rem; font-size: 0.9rem; color: var(--muted); }
+#hover-info-bar { position: fixed; left: 0; bottom: 0; z-index: 1000; max-width: min(90vw, 900px); padding: 0.25rem 0.6rem; background: rgba(8,10,15,0.96); color: #c9d0dc; border: 1px solid var(--border); border-left: 0; border-bottom: 0; border-radius: 0 5px 0 0; font: 12px/1.4 ui-monospace, SFMono-Regular, Consolas, monospace; overflow-wrap: anywhere; display: none; }
+#leader-panel {
+  position: fixed;
+  top: 100px;
+  left: 12px;
+  width: 290px;
+  max-height: calc(100vh - 115px);
+  overflow-y: auto;
+  z-index: 9;
+  box-shadow: 0 8px 28px rgba(0,0,0,0.35);
+}
+body.profile-visible .hero,
+body.profile-visible section,
+body.profile-visible footer {
+  margin-left: 314px;
+}
+@media (max-width: 900px) {
+  #leader-panel {
+    position: relative;
+    top: auto;
+    left: auto;
+    width: auto;
+    max-height: none;
+    margin: 1rem;
+  }
+  body.profile-visible .hero,
+  body.profile-visible section,
+  body.profile-visible footer {
+    margin-left: auto;
+  }
+}
+body.session-booting header,
+body.session-booting .hero,
+body.session-booting section,
+body.session-booting footer { visibility: hidden; }
+body.session-booting #leader-panel { visibility: visible; }
+body:not(.officer-page) #leaders,
+body:not(.officer-page) #corp-officers { display: none !important; }
+body.officer-page .hero,
+body.officer-page #mission,
+body.officer-page #comms,
+body.officer-page #esi,
+body.officer-page #join { display: none !important; }
+body.officer-page #leaders,
+body.officer-page #corp-officers { padding-top: 1.6rem; padding-bottom: 0.5rem; }
+body.officer-page #corp-officers { padding-bottom: 3rem; }
+
+body.info-page .hero, body.info-page #mission, body.info-page #comms, body.info-page #join, body.info-page #leaders, body.info-page #corp-officers, body.info-page #leader-panel { display: none !important; }
+body.info-page #esi { display: block !important; margin: 0 auto; padding-top: 2rem; }
+body.info-page footer { margin-left: 0 !important; }
+body.info-page #esi { margin-left: auto !important; }
+</style>
+</head>
+<body class="info-page">
+
+<header>
+  <div class="logo-area">
+    <div class="logo">ZRBA</div>
+    <h1><span>Zeta</span> Reticuli <small style="color:#8a8f99;font-size:0.75rem;font-weight:400;">[ZRBA]</small></h1>
+  </div>
+  <nav>
+    <a href="/#mission">Mission</a>
+    <a href="/#comms">Communications</a>
+    <a href="/info.html">ESI / API</a>
+    <a href="/#join">Join</a>
+    <a href="/officers.html" id="corp-officers-link" style="display:none;">Corp Officers</a>
+    <a href="#" id="logout-link" style="display:none;">Logout</a>
+  </nav>
+</header>
+
+<aside class="card" id="leader-panel" aria-label="Your character profile" style="display:none;">
+  <h4>Your Character Profile</h4>
+  <div id="applicant-info"></div>
+</aside>
+
+<div class="hero">
+  <h2>Zeta Reticuli Blackpill Alliance</h2>
+  <p>A disciplined EVE Online alliance focused on high-sec power, nullsec operations, and unwavering loyalty.</p>
+  <a class="btn" href="#join">Join Zeta Reticuli</a>
+  <a class="btn btn-outline" href="#esi">Connect with ESI</a>
+</div>
+
+<section id="mission">
+  <h3>Mission Statement</h3>
+  <div class="card">
+    <p>Zeta Reticuli Blackpill Alliance exists to build a disciplined, self-sufficient organization that dominates its space, protects its members, and projects power across New Eden. We reward contribution, punish betrayal, and never forget those who stand with us. Through active leadership, dedicated fleets, and superior intel, we turn capsuleers into a force that cannot be ignored.</p>
+  </div>
+</section>
+
+<section id="comms">
+  <h3>Communications</h3>
+  <div class="grid">
+    <div class="card">
+      <h4>In-Game Chat</h4>
+      <p>Join the channel: <strong>Zeta Reticuli</strong></p>
+      <p>Primary voice for fleet form-ups, intel, and daily ops.</p>
+    </div>
+    <div class="card">
+      <h4>Discord</h4>
+      <p>Full voice, text channels, and recruitment.</p>
+      <p><a href="https://discord.gg/placeholder" target="_blank">discord.gg/zetareticuli</a> (replace with real invite)</p>
+    </div>
+    <div class="card">
+      <h4>ESI-Linked Tools</h4>
+      <p>Log in with EVE SSO to view live corp data, member status, and more via the official EVE Swagger Interface.</p>
+    </div>
+  </div>
+</section>
+
+<section id="esi">
+  <h3>ESI – EVE Swagger Interface</h3>
+  <div class="card">
+    <p>ESI is CCP’s official RESTful API for EVE Online. It replaced the old XML API and CREST. It uses the Swagger/OpenAPI standard so the documentation is always up to date, and authentication is handled through EVE Single Sign-On (SSO) with OAuth 2.0.</p>
+    <p style="margin-top:0.8rem;">With ESI you can pull character, corporation, alliance, market, killmail, and more data — publicly or with the correct scopes after a player logs in.</p>
+    <ul style="margin-top:0.8rem;">
+      <li>Swagger UI: <a href="https://esi.evetech.net/ui/" target="_blank">esi.evetech.net/ui</a></li>
+      <li>Developer docs: <a href="https://developers.eveonline.com/docs/services/esi/" target="_blank">developers.eveonline.com</a></li>
+      <li>SSO login: required for private endpoints (corp roles, wallet, assets, etc.)</li>
+    </ul>
+    <div style="margin-top:1.2rem;">
+      <button class="btn" id="sso-btn">Login with EVE SSO</button>
+      <button class="btn btn-outline" id="public-btn">Load Public Corp Info</button>
+    </div>
+    <div id="esi-status">Click “Login with EVE SSO” to authenticate via ESI, or load public corporation data.</div>
+  </div>
+  <div class="card" style="margin-top:1rem;">
+    <h4>SSO setup notes</h4>
+    <ol style="padding-left:1.2rem; color:var(--muted); font-size:0.95rem;">
+      <li>Client ID is set (<code>f6080d22aeda4a90a3f20c5906d83037</code>).</li>
+      <li>Live site: <code>https://zrba-eve.dataloss.workers.dev/</code></li>
+      <li>In your ESI app set Callback URL to <code>https://zrba-eve.dataloss.workers.dev/callback</code>.</li>
+      <li>Login uses PKCE. The Worker handles the token exchange so CORS does not block it.</li>
+    </ol>
+  </div>
+</section>
+
+<section id="join">
+  <h3>Apply to Zeta Reticuli Blackpill Alliance</h3>
+  <div class="card">
+    <p>Log in with your EVE character. Leaders are detected automatically after login.</p>
+    <button class="btn" id="apply-btn" style="margin-top:1rem;">Login with EVE</button>
+    <div id="apply-status" style="margin-top:1rem; color:var(--muted); font-size:0.95rem;"></div>
+  </div>
+  <div class="card" id="application-status-panel" style="margin-top:1rem;display:none;">
+    <h4>Application Status</h4>
+    <div id="application-decision-status"></div>
+  </div>
+
+</section>
+
+<section id="leaders" style="display:none;">
+  <h3>Leader Review</h3>
+  <div class="card">
+    <p id="leader-welcome">You are signed in as a leader.</p>
+    <button class="btn" id="pending-btn" style="margin-top:1rem;">Pending Applications</button>
+    <button class="btn btn-outline" id="declined-btn" style="margin-top:1rem;">Declined Applications</button>
+    <div id="leader-status" style="margin-top:1rem; color:var(--muted); font-size:0.95rem;"></div>
+    <div id="leader-list" style="margin-top:1rem; display:flex; flex-wrap:wrap; gap:1rem;"></div>
+    <div id="leader-detail" style="margin-top:1rem;"></div>
+  </div>
+</section>
+
+<section id="corp-officers" style="display:none;">
+  <h3>Corp Officers</h3>
+  <div class="card">
+    <p id="officers-corp-name">Registered character corporation status</p>
+    <p style="color:var(--muted);font-size:0.9rem;">Only characters who registered through this website are shown. Corporation affiliation is checked against EVE ESI when this page is loaded.</p>
+    <button class="btn btn-outline" id="officers-refresh-btn" type="button">Refresh</button>
+    <p id="officers-status" style="margin-top:0.8rem;color:var(--muted);"></p>
+    <h4 style="margin-top:1rem;">Current Corporation Members (<span id="officers-member-count">0</span>)</h4>
+    <div id="officers-members"></div>
+    <h4 style="margin-top:1.5rem;">Accepted — Awaiting Corporation Transfer (<span id="officers-awaiting-count">0</span>)</h4>
+    <div id="officers-awaiting"></div>
+  </div>
+</section>
+
+<div id="hover-info-bar" aria-live="polite"></div>
+
+<footer>
+  Zeta Reticuli Blackpill Alliance — EVE Online Corporation &nbsp;|&nbsp; Powered by ESI &nbsp;|&nbsp; Not affiliated with CCP Games
+</footer>
+
+<script>
+const CLIENT_ID = "f6080d22aeda4a90a3f20c5906d83037";
+const REDIRECT_URI = window.location.origin + "/callback";
+const SCOPES = [
+  "publicData",
+  "esi-characters.read_contacts.v1",
+  "esi-killmails.read_killmails.v1",
+  "esi-characters.read_loyalty.v1",
+  "esi-characters.read_medals.v1",
+  "esi-characters.read_standings.v1",
+  "esi-characters.read_agents_research.v1",
+  "esi-characters.read_blueprints.v1",
+  "esi-characters.read_corporation_roles.v1",
+  "esi-characters.read_fatigue.v1",
+  "esi-characters.read_notifications.v1",
+  "esi-characters.read_titles.v1",
+  "esi-characters.read_fw_stats.v1",
+  "esi-characters.read_freelance_jobs.v1",
+  "esi-activities.read_character.v1",
+  "esi-access.read_lists.v1"
+].join(" ");
+
+function base64url(buf) {
+  return btoa(String.fromCharCode(...new Uint8Array(buf)))
+    .replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
+}
+async function sha256(str) {
+  const data = new TextEncoder().encode(str);
+  return crypto.subtle.digest("SHA-256", data);
+}
+function randomString(len = 43) {
+  const arr = new Uint8Array(len);
+  crypto.getRandomValues(arr);
+  return base64url(arr).slice(0, len);
+}
+
+async function startLogin() {
+  const verifier = randomString(64);
+  const challenge = base64url(await sha256(verifier));
+  sessionStorage.setItem("pkce_verifier", verifier);
+  const url = `https://login.eveonline.com/v2/oauth/authorize?response_type=code&redirect_uri=${encodeURIComponent(REDIRECT_URI)}&client_id=${CLIENT_ID}&scope=${encodeURIComponent(SCOPES)}&code_challenge=${challenge}&code_challenge_method=S256&state=login`;
+  window.location.href = url;
+}
+
+async function exchangeCode(code) {
+  const verifier = sessionStorage.getItem("pkce_verifier");
+  const res = await fetch("/exchange", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ code, code_verifier: verifier })
+  });
+  if (!res.ok) {
+    const err = await res.text();
+    throw new Error(err || "Token exchange failed");
+  }
+  return res.json();
+}
+
+const nativeFetch = window.fetch.bind(window);
+window.fetch = async (input, init = {}) => {
+  const url = typeof input === "string" ? input : input instanceof Request ? input.url : String(input);
+  const target = new URL(url, window.location.href);
+  const headers = new Headers(init.headers || (input instanceof Request ? input.headers : undefined));
+  if (target.origin === window.location.origin && headers.has("Authorization") &&
+      !["/refresh", "/exchange", "/logout"].includes(target.pathname)) {
+    const token = await ensureFreshToken();
+    headers.set("Authorization", "Bearer " + token);
+    init = { ...init, headers };
+  }
+  return nativeFetch(input, init);
+};
+const SESSION_SCOPES_KEY = "eve_authorized_scopes";
+async function refreshSession() {
+  const response = await fetch("/refresh", { method: "POST", credentials: "same-origin" });
+  if (!response.ok) return null;
+  const data = await response.json();
+  return data.access_token || null;
+}
+function scopesNeedAuthorization(token) {
+  const claims = parseJwt(token);
+  const granted = grantedScopes(claims);
+  return SCOPES.split(" ").some(scope => scope !== "publicData" && !granted.has(scope));
+}
+function sessionExpiryMs(token) {
+  try { return Number(parseJwt(token).exp) * 1000; } catch { return 0; }
+}
+async function ensureFreshToken() {
+  if (currentToken && sessionExpiryMs(currentToken) > Date.now() + 90000) return currentToken;
+  const refreshed = await refreshSession();
+  if (!refreshed) throw new Error("Your EVE session has expired. Please log in again.");
+  if (scopesNeedAuthorization(refreshed)) throw new Error("ESI permissions changed. Please log in again to authorize the requested scopes.");
+  currentToken = refreshed;
+  sessionStorage.setItem("access_token", refreshed);
+  return refreshed;
+}
+function parseJwt(token) {
+  const payload = token.split(".")[1];
+  return JSON.parse(atob(payload.replace(/-/g, "+").replace(/_/g, "/")));
+}
+
+function grantedScopes(claims) {
+  const scp = claims.scp;
+  if (!scp) return new Set();
+  return new Set(Array.isArray(scp) ? scp : String(scp).split(" "));
+}
+
+async function esiAuth(path, token) {
+  const res = await fetch("https://esi.evetech.net/latest" + path, {
+    headers: { Authorization: "Bearer " + token }
+  });
+  if (!res.ok) return null;
+  return res.json();
+}
+
+const corpNameCache = {};
+async function corpNameFor(id) {
+  if (!id) return "—";
+  if (corpNameCache[id]) return corpNameCache[id];
+  try {
+    const c = await fetch(`https://esi.evetech.net/latest/corporations/${id}/`).then(r => r.json());
+    corpNameCache[id] = c.name || String(id);
+  } catch (e) {
+    corpNameCache[id] = String(id);
+  }
+  return corpNameCache[id];
+}
+
+async function loadApplicant(token, { submitApplication = true } = {}) {
+  const claims = parseJwt(token);
+  const charId = claims.sub.split(":").pop();
+  let existingApplication = null;
+  try {
+    const statusRes = await fetch("/application-status", { headers: { Authorization: "Bearer " + token } });
+    if (statusRes.ok) {
+      const statusData = await statusRes.json();
+      existingApplication = statusData.application || null;
+      renderApplicationStatus(existingApplication, statusData.recruitment_leaders || []);
+    }
+  } catch (e) {}
+  const scopes = grantedScopes(claims);
+  const has = (s) => scopes.has(s);
+  const [char, portrait, history, killmails, contacts, loyalty, medals, standings, roles, fatigue, notifications, titles, fw, freelance] = await Promise.all([
+    fetch(`https://esi.evetech.net/latest/characters/${charId}/`).then(r => r.json()),
+    fetch(`https://esi.evetech.net/latest/characters/${charId}/portrait/`).then(r => r.json()),
+    fetch(`https://esi.evetech.net/latest/characters/${charId}/corporationhistory/`).then(r => r.json()),
+    has("esi-killmails.read_killmails.v1") ? esiAuth(`/characters/${charId}/killmails/recent/`, token) : null,
+    has("esi-characters.read_contacts.v1") ? esiAuth(`/characters/${charId}/contacts/`, token) : null,
+    has("esi-characters.read_loyalty.v1") ? esiAuth(`/characters/${charId}/loyalty/points/`, token) : null,
+    has("esi-characters.read_medals.v1") ? esiAuth(`/characters/${charId}/medals/`, token) : null,
+    has("esi-characters.read_standings.v1") ? esiAuth(`/characters/${charId}/standings/`, token) : null,
+    has("esi-characters.read_corporation_roles.v1") ? esiAuth(`/characters/${charId}/roles/`, token) : null,
+    has("esi-characters.read_fatigue.v1") ? esiAuth(`/characters/${charId}/fatigue/`, token) : null,
+    has("esi-characters.read_notifications.v1") ? esiAuth(`/characters/${charId}/notifications/`, token) : null,
+    has("esi-characters.read_titles.v1") ? esiAuth(`/characters/${charId}/titles/`, token) : null,
+    has("esi-characters.read_fw_stats.v1") ? esiAuth(`/characters/${charId}/fw/stats/`, token) : null,
+    has("esi-characters.read_freelance_jobs.v1") ? esiAuth(`/characters/${charId}/freelance/jobs/`, token) : null
+  ]);
+  let corpName = await corpNameFor(char.corporation_id);
+  const namedHistory = [];
+  for (const h of (history || []).slice(0, 12)) {
+    namedHistory.push({ ...h, corporation_name: await corpNameFor(h.corporation_id) });
+  }
+  const kmCount = Array.isArray(killmails) ? killmails.length : "—";
+  const contactCount = Array.isArray(contacts) ? contacts.length : "—";
+  const medalCount = Array.isArray(medals) ? medals.length : "—";
+  const panel = document.getElementById("leader-panel");
+  panel.style.display = "block";
+  document.body.classList.add("profile-visible");
+  document.getElementById("applicant-info").innerHTML = `
+    <img src="${portrait.px128x128 || portrait.px64x64 || ""}" alt="portrait" style="border-radius:6px; margin-bottom:0.6rem;">
+    <p><strong>${char.name}</strong> (ID ${charId})</p>
+    <p>Current corporation: ${corpName}</p>
+    <p>Security status: ${char.security_status != null ? char.security_status.toFixed(2) : "—"}</p>
+    <p>Birthday: ${char.birthday ? char.birthday.slice(0,10) : "—"}</p>
+    <p>Recent killmails: ${kmCount}</p>
+    <p>Contacts: ${contactCount}</p>
+    <p>Medals: ${medalCount}</p>
+    <p>Jump fatigue: ${fatigue && fatigue.jump_fatigue_expire_date ? fatigue.jump_fatigue_expire_date : "—"}</p>
+    <details style="margin-top:0.6rem;border:1px solid var(--border);border-radius:6px;padding:0.7rem;">
+      <summary style="cursor:pointer;font-weight:600;">Corporation history</summary>
+      <ul style="margin-top:0.6rem;">${namedHistory.slice(0, 8).map(h => `<li>${h.corporation_name || h.corporation_id} — joined ${h.start_date ? h.start_date.slice(0,10) : "?"}</li>`).join("") || "<li>None</li>"}</ul>
+    </details>
+  `;
+  document.getElementById("apply-status").textContent = existingApplication ? "Your application status is shown above your profile." : (submitApplication ? "Submitting your application…" : "Your character profile is shown below.");
+  if (!existingApplication && submitApplication) try {
+    const submitRes = await fetch("/applications", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "Authorization": "Bearer " + token
+      },
+      body: JSON.stringify({
+        name: char.name,
+        character_id: charId,
+        corporation: corpName,
+        corporation_id: char.corporation_id,
+        security_status: char.security_status,
+        birthday: char.birthday,
+        portrait: portrait.px128x128 || portrait.px64x64 || "",
+        history: namedHistory,
+        killmail_count: Array.isArray(killmails) ? killmails.length : null,
+        contact_count: Array.isArray(contacts) ? contacts.length : null,
+        medal_count: Array.isArray(medals) ? medals.length : null,
+        loyalty: loyalty,
+        standings: standings,
+        roles: roles,
+        fatigue: fatigue,
+        titles: titles,
+        fw_stats: fw,
+        freelance_jobs: freelance,
+        notification_count: Array.isArray(notifications) ? notifications.length : null,
+        granted_scopes: [...scopes]
+      })
+    });
+    if (submitRes.ok) {
+      const statusRes = await fetch("/application-status", { headers: { Authorization: "Bearer " + token } });
+      if (statusRes.ok) {
+        const statusData = await statusRes.json();
+        renderApplicationStatus(statusData.application || null, statusData.recruitment_leaders || []);
+      }
+      document.getElementById("apply-status").textContent = "Application submitted and pending review.";
+    } else {
+      let detail = "";
+      try {
+        const errorData = await submitRes.json();
+        if (errorData && errorData.error) detail = ": " + errorData.error;
+      } catch (e) {}
+      document.getElementById("apply-status").textContent = "Application submission failed (HTTP " + submitRes.status + ")" + detail + ".";
+    }
+  } catch (e) {
+    document.getElementById("apply-status").textContent = "Application submission failed: " + (e && e.message ? e.message : String(e));
+  }
+}
+
+function renderApplicationStatus(application, leaders) {
+  const box = document.getElementById("application-decision-status");
+  if (!box) return;
+  const accepted = application?.status === "accepted";
+  const joinSection = document.getElementById("join");
+  if (joinSection) joinSection.style.display = accepted ? "none" : "";
+  const statusPanel = document.getElementById("application-status-panel");
+  if (statusPanel) statusPanel.style.display = application ? "block" : "none";
+  if (!application) { box.innerHTML = ""; return; }
+  if (application.status === "accepted") {
+    box.innerHTML = '<p style="border:1px solid #347b53; padding:0.8rem; border-radius:6px; color:#8fe0ad;"><strong>Application Status: Accepted</strong></p>';
+  } else if (application.status === "declined") {
+    const availableLeaders = leaders.map(l => typeof l === "string" ? { id: "", name: l } : l);
+    const existingDiscussion = application.discussion;
+    if (existingDiscussion?.summary) {
+      box.innerHTML = '<div style="border:1px solid #9b4242; padding:0.8rem; border-radius:6px;">' +
+        '<p style="color:#ff9b9b;"><strong>Application Status: Declined</strong></p>' +
+        '<p style="margin-top:0.6rem;"><strong>Your submitted discussion summary</strong></p>' +
+        '<p style="white-space:pre-wrap;margin-top:0.4rem;">' + escapeHtml(existingDiscussion.summary) + '</p>' +
+        '<p style="margin-top:0.5rem;"><strong>Leader spoken with:</strong> ' + escapeHtml(existingDiscussion.leader_name || "") + '</p>' +
+        '<p style="margin-top:0.5rem;color:var(--muted);">Submitted. Awaiting leader review.</p></div>';
+      return;
+    }
+    box.innerHTML = '<div style="border:1px solid #9b4242; padding:0.8rem; border-radius:6px;">' +
+      '<p style="color:#ff9b9b;"><strong>Application Status: Declined</strong></p>' +
+      '<p style="margin:0.5rem 0;">Summarize your conversation with a recruitment leader and select who you spoke with.</p>' +
+      '<textarea id="discussion-summary" maxlength="1000" rows="4" placeholder="Brief summary (maximum 1000 characters)" style="width:100%;padding:0.6rem;background:var(--bg);color:var(--text);border:1px solid var(--border);border-radius:5px;">' + escapeHtml(existingDiscussion?.summary || "") + '</textarea>' +
+      '<p style="margin:0.5rem 0;">Leader you spoke with:</p>' +
+      '<div id="discussion-leaders" style="display:flex;gap:0.5rem;flex-wrap:wrap;"></div>' +
+      '<button class="btn" id="submit-discussion" style="margin-top:0.8rem;">Submit summary</button>' +
+      '<p id="discussion-status" style="margin-top:0.5rem;color:var(--muted);"></p></div>';
+    let selectedLeaderId = existingDiscussion?.leader_id || "";
+    const buttons = document.getElementById("discussion-leaders");
+    const leaderButtons = [];
+    const refreshSelection = () => {
+      leaderButtons.forEach(button => {
+        const selected = button.dataset.leaderId === selectedLeaderId;
+        button.style.background = selected ? "var(--accent)" : "transparent";
+        button.style.color = selected ? "#0a0c12" : "var(--accent)";
+        button.setAttribute("aria-pressed", String(selected));
+      });
+    };
+    availableLeaders.forEach(leader => {
+      if (!leader.id) return;
+      const button = document.createElement("button");
+      button.className = "btn";
+      button.type = "button";
+      button.dataset.leaderId = leader.id;
+      button.style.cssText = "font-size:0.85rem;padding:0.35rem 0.75rem;border:1px solid var(--accent);";
+      button.textContent = leader.name;
+      button.onclick = () => { selectedLeaderId = leader.id; refreshSelection(); };
+      buttons.appendChild(button);
+      leaderButtons.push(button);
+    });
+    refreshSelection();
+    const message = document.getElementById("discussion-status");
+    document.getElementById("submit-discussion").onclick = async () => {
+      const summary = document.getElementById("discussion-summary").value.trim();
+      if (!summary) { message.textContent = "Enter a summary first."; return; }
+      if (!selectedLeaderId) { message.textContent = "Select the leader you spoke with."; return; }
+      message.textContent = "Submitting summary…";
+      try {
+        const response = await fetch("/application-discussion", {
+          method: "POST",
+          headers: { "Content-Type": "application/json", Authorization: "Bearer " + currentToken },
+          body: JSON.stringify({ summary, leader_id: selectedLeaderId })
+        });
+        const result = await response.json();
+        if (!response.ok) throw new Error(result.error || "Submission failed");
+        application.discussion = result.discussion;
+        renderApplicationStatus(application, leaders);
+      } catch (error) { message.textContent = "Could not submit: " + error.message; }
+    };
+  } else {
+    box.innerHTML = '<p style="border:1px solid var(--border); padding:0.8rem; border-radius:6px;"><strong>Application Status: Pending review</strong></p>';
+  }
+}
+
+function formatReviewTimestamp(value) {
+  if (!value) return "—";
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "—";
+  return new Intl.DateTimeFormat("en-US", {
+    month: "2-digit", day: "2-digit", year: "2-digit",
+    hour: "2-digit", minute: "2-digit", hourCycle: "h23"
+  }).format(date).replace(",", "");
+}
+
+function escapeHtml(value) {
+  return String(value).replace(/[&<>"\']/g, ch => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"' : "&quot;", "\'": "&#39;" }[ch]));
+}
+
+const hoverInfoBar = document.getElementById("hover-info-bar");
+function setHoverInfo(text) {
+  if (!hoverInfoBar) return;
+  hoverInfoBar.textContent = text || "";
+  hoverInfoBar.style.display = text ? "block" : "none";
+}
+document.querySelectorAll("a[href]").forEach(link => {
+  link.addEventListener("mouseenter", () => {
+    const href = link.href;
+    if (href && !href.endsWith("#")) setHoverInfo(href);
+  });
+  link.addEventListener("mouseleave", () => setHoverInfo(""));
+});
+document.querySelectorAll("button").forEach(button => {
+  button.addEventListener("mouseenter", () => {
+    const target = button.dataset.infoUrl;
+    if (target) setHoverInfo(target);
+    else if (button.id === "apply-btn" || button.id === "sso-btn") setHoverInfo("https://login.eveonline.com/v2/oauth/authorize");
+    else if (button.id === "public-btn") setHoverInfo("GET https://esi.evetech.net/latest/corporations/1000001/?datasource=tranquility");
+    else if (button.id === "pending-btn") setHoverInfo("GET /applications");
+    else if (button.id === "declined-btn") setHoverInfo("GET /applications?status=declined");
+    else if (button.id === "accept-application-btn" || button.id === "decline-application-btn") setHoverInfo("POST /application-decision");
+    else setHoverInfo("");
+  });
+  button.addEventListener("mouseleave", () => setHoverInfo(""));
+});
+document.getElementById("apply-btn").addEventListener("click", startLogin);
+document.getElementById("sso-btn").addEventListener("click", startLogin);
+document.getElementById("logout-link").addEventListener("click", async (e) => {
+  e.preventDefault();
+  if (declinedSummaryPoll) clearInterval(declinedSummaryPoll);
+  sessionStorage.removeItem("access_token");
+  sessionStorage.removeItem("pkce_verifier");
+  await fetch("/logout", { method: "POST", credentials: "same-origin" }).catch(() => {});
+  window.location.href = "/";
+});
+
+async function loadCorpOfficers() {
+  const status = document.getElementById("officers-status");
+  status.textContent = "Checking registered characters against ESI…";
+  try {
+    const response = await fetch("/corp-officers", { headers: { Authorization: "Bearer " + currentToken } });
+    const data = await response.json();
+    if (!response.ok) throw new Error(data.error || "Could not load corporation records");
+    document.getElementById("officers-corp-name").textContent = data.corporation_name + " (Corporation ID: " + data.corporation_id + ")";
+    const render = (users, target, count) => {
+      document.getElementById(count).textContent = users.length;
+      document.getElementById(target).innerHTML = users.length
+        ? '<ul style="padding-left:1.4rem;">' + users.sort((a,b) => a.name.localeCompare(b.name)).map(user =>
+            '<li style="margin:0.45rem 0;">' + escapeHtml(user.name) + ' <span style="color:var(--muted);font-size:0.85rem;">(' + escapeHtml(user.character_id) + ')</span> <button type="button" class="remove-member-btn" data-character-id="' + user.character_id + '" data-character-name="' + escapeHtml(user.name) + '" style="font-size:0.72rem;padding:0.2rem 0.45rem;margin-left:0.5rem;background:transparent;color:#ff9c9c;border:1px solid #a45a5a;border-radius:4px;cursor:pointer;">Remove from Corp</button></li>').join("") + '</ul>'
+        : '<p style="color:var(--muted);">No registered characters in this category.</p>';
+    };
+    render(data.members, "officers-members", "officers-member-count");
+    render(data.awaiting_transfer, "officers-awaiting", "officers-awaiting-count");
+    document.querySelectorAll("#officers-members .remove-member-btn, #officers-awaiting .remove-member-btn").forEach(button => {
+      button.addEventListener("click", async () => {
+        const characterId = button.dataset.characterId;
+        const name = button.dataset.characterName;
+        if (!window.confirm("Remove " + name + " from the website's corporation roster and delete all their applications? They must apply again from scratch. This does NOT remove them from the EVE Online corporation.")) return;
+        button.disabled = true;
+        status.textContent = "Removing " + name + "…";
+        try {
+          const result = await fetch("/corp-officers/remove", {
+            method: "POST",
+            headers: { "Content-Type": "application/json", Authorization: "Bearer " + currentToken },
+            body: JSON.stringify({ character_id: characterId })
+          });
+          const data = await result.json();
+          if (!result.ok) throw new Error(data.error || "Removal failed");
+          await loadCorpOfficers();
+          document.getElementById("officers-status").textContent = name + " removed from website records. A new application is required.";
+        } catch (error) {
+          status.textContent = "Removal failed: " + error.message;
+          button.disabled = false;
+        }
+      });
+    });
+    status.textContent = "Current ESI corporation affiliations checked.";
+  } catch (error) { status.textContent = "Could not load: " + error.message; }
+}
+
+document.getElementById("officers-refresh-btn").addEventListener("click", loadCorpOfficers);
+
+let currentToken = null;
+let currentApps = [];
+let currentListStatus = "pending";
+let declinedSummaryPoll = null;
+let selectedApplicationKey = null;
+function updateDeclinedSummaryPolling() {
+  if (declinedSummaryPoll) clearInterval(declinedSummaryPoll);
+  declinedSummaryPoll = null;
+  if (currentListStatus !== "declined" || document.getElementById("leaders").style.display === "none") return;
+  declinedSummaryPoll = setInterval(async () => {
+    if (document.hidden || currentListStatus !== "declined") return;
+    try {
+      const response = await fetch("/applications?status=declined", {
+        headers: { Authorization: "Bearer " + currentToken }
+      });
+      if (!response.ok) return;
+      const updated = await response.json();
+      const previous = currentApps;
+      const previousSelected = previous.find(a => a.application_key === selectedApplicationKey);
+      const updatedSelected = updated.find(a => a.application_key === selectedApplicationKey);
+      const summaryChanged = previousSelected && updatedSelected &&
+        JSON.stringify(previousSelected.discussion || null) !== JSON.stringify(updatedSelected.discussion || null);
+      const listChanged = previous.length !== updated.length ||
+        previous.some((a, i) => a.application_key !== updated[i]?.application_key);
+      currentApps = updated;
+      if (listChanged) {
+        const list = document.getElementById("leader-list");
+        list.innerHTML = updated.map((a, i) => `
+          <button data-i="${i}" style="background:transparent; border:1px solid var(--border); border-radius:8px; padding:0.5rem; cursor:pointer; color:inherit; text-align:center;">
+            <img src="${a.portrait || ""}" alt="${escapeHtml(a.name || "")}" style="width:72px; height:72px; border-radius:6px; display:block;">
+            <span style="font-size:0.8rem; display:block; margin-top:0.3rem;">${escapeHtml(a.name || "")}</span>
+          </button>`).join("") || "<p>No applications yet.</p>";
+        list.querySelectorAll("button[data-i]").forEach(btn => {
+          btn.addEventListener("click", () => showProfile(currentApps[Number(btn.dataset.i)]));
+        });
+        document.getElementById("leader-status").textContent = updated.length + " declined application(s). Click a portrait to review.";
+      }
+      if (summaryChanged && selectedApplicationKey === updatedSelected.application_key) {
+        await showProfile(updatedSelected, false);
+      } else if (previousSelected && !updatedSelected) {
+        selectedApplicationKey = null;
+        document.getElementById("leader-detail").innerHTML = "";
+      }
+    } catch (error) { /* Keep the existing dashboard when a background check fails. */ }
+  }, 10000);
+}
+
+
+async function showProfile(a, scroll = true) {
+  selectedApplicationKey = a.application_key;
+  const detail = document.getElementById("leader-detail");
+  detail.innerHTML = "<p>Loading profile…</p>";
+  const currentCorp = a.corporation && isNaN(Number(a.corporation)) ? a.corporation : await corpNameFor(a.corporation_id || a.corporation);
+  const hist = [];
+  for (const h of (a.history || []).slice(0, 12)) {
+    const name = h.corporation_name && isNaN(Number(h.corporation_name)) ? h.corporation_name : await corpNameFor(h.corporation_id);
+    hist.push(`<li>${name} — ${h.start_date ? h.start_date.slice(0,10) : "?"}</li>`);
+  }
+  const declined = a.status === "declined";
+  detail.innerHTML = `
+    <div class="card">
+      <img src="${a.portrait || ""}" alt="" style="border-radius:6px; width:96px; height:96px; display:block;">
+      <div style="display:flex; gap:0.6rem; margin:0.6rem 0 1rem;">
+        ${declined ? (a.discussion?.summary ? '<button class="btn" id="review-application-btn">Review — return to pending</button>' : '<p>Waiting for the applicant to submit their discussion summary before review is available.</p>') : '<button class="btn" id="accept-application-btn" style="background:#347b53;color:#fff;">Accept</button><button class="btn" id="decline-application-btn" style="background:#9b4242;color:#fff;">Decline</button>'}
+      </div>
+      <h4 style="margin-top:0.6rem;">${a.name}</h4>
+      <p>Character ID: ${a.character_id}</p>
+      <p>Corporation: ${currentCorp}</p>
+      <p>Security: ${a.security_status != null ? Number(a.security_status).toFixed(2) : "—"}</p>
+      <p>Birthday: ${a.birthday ? String(a.birthday).slice(0,10) : "—"}</p>
+      <p>Submitted: ${a.submitted_at || "—"}</p>
+      ${declined ? `<details style="margin:0.8rem 0;border:1px solid var(--border);border-radius:6px;padding:0.7rem;"><summary style="cursor:pointer;font-weight:600;">Applicant discussion summary ${a.discussion ? "— submitted" : "— awaiting submission"}</summary><div style="margin-top:0.6rem;">${a.discussion ? `<p><strong>Leader selected:</strong> ${escapeHtml(a.discussion.leader_name || "")}</p><p style="white-space:pre-wrap;">${escapeHtml(a.discussion.summary || "")}</p><p><strong>Submitted:</strong> ${escapeHtml(a.discussion.updated_at || "—")}</p>` : "<p>No discussion summary submitted yet.</p>"}</div></details>` : (a.discussion ? `<p><strong>Applicant discussion with ${escapeHtml(a.discussion.leader_name || "")}:</strong> ${escapeHtml(a.discussion.summary || "")}</p>` : "")}
+      ${a.review_history?.length ? `<details style="margin:0.8rem 0;border:1px solid var(--border);border-radius:6px;padding:0.7rem;"><summary style="cursor:pointer;font-weight:600;">Review history (${a.review_history.length})</summary><ul style="margin:0.6rem 0 0;padding-left:1.3rem;">${a.review_history.map(r => `<li>${escapeHtml(r.leader_name || r.leader_id)} — ${escapeHtml(formatReviewTimestamp(r.reviewed_at))}</li>`).join("")}</ul></details>` : ""}
+      <p>Recent killmails: ${a.killmail_count != null ? a.killmail_count : "—"}</p>
+      <p>Contacts: ${a.contact_count != null ? a.contact_count : "—"}</p>
+      <p>Medals: ${a.medal_count != null ? a.medal_count : "—"}</p>
+      <details style="margin-top:0.6rem;border:1px solid var(--border);border-radius:6px;padding:0.7rem;">
+        <summary style="cursor:pointer;font-weight:600;">Corporation history</summary>
+        <ul style="margin-top:0.6rem;">${hist.join("") || "<li>None</li>"}</ul>
+      </details>
+    </div>
+  `;
+  const acceptBtn = document.getElementById("accept-application-btn");
+  const declineBtn = document.getElementById("decline-application-btn");
+  if (acceptBtn) acceptBtn.onclick = () => decideApplication(a, "accepted");
+  if (declineBtn) declineBtn.onclick = () => decideApplication(a, "declined");
+  const reviewBtn = document.getElementById("review-application-btn");
+  if (reviewBtn) reviewBtn.onclick = () => reopenApplication(a);
+  if (scroll) detail.scrollIntoView({ behavior: "smooth" });
+}
+
+async function decideApplication(application, statusValue) {
+  const status = document.getElementById("leader-status");
+  status.textContent = "Saving decision…";
+  try {
+    const res = await fetch("/application-decision", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Authorization: "Bearer " + currentToken },
+      body: JSON.stringify({ application_key: application.application_key, status: statusValue })
+    });
+    const result = await res.json();
+    if (!res.ok) throw new Error(result.error || "Decision failed");
+    document.getElementById("leader-detail").innerHTML = "";
+    status.textContent = "Application " + statusValue + ".";
+    await loadPending();
+  } catch (err) {
+    status.textContent = "Could not save decision: " + err.message;
+  }
+}
+
+async function reopenApplication(application) {
+  const status = document.getElementById("leader-status");
+  status.textContent = "Returning application to pending…";
+  try {
+    const response = await fetch("/application-review", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Authorization: "Bearer " + currentToken },
+      body: JSON.stringify({ application_key: application.application_key })
+    });
+    const result = await response.json();
+    if (!response.ok) throw new Error(result.error || "Review failed");
+    document.getElementById("leader-detail").innerHTML = "";
+    await loadPending();
+    status.textContent += " Application reopened for review.";
+  } catch (error) { status.textContent = "Could not reopen application: " + error.message; }
+}
+
+async function loadPending(type = "pending") {
+  currentListStatus = type === "declined" ? "declined" : "pending";
+  selectedApplicationKey = null;
+  updateDeclinedSummaryPolling();
+  const status = document.getElementById("leader-status");
+  const list = document.getElementById("leader-list");
+  status.textContent = "Loading " + currentListStatus + " applications…";
+  try {
+    const res = await fetch("/applications?status=" + currentListStatus, {
+      headers: { Authorization: "Bearer " + currentToken }
+    });
+    if (!res.ok) {
+      let detail = "";
+      try {
+        const body = await res.json();
+        detail = body.error ? " (" + body.error + ")" : "";
+      } catch (e) {}
+      status.textContent = "Could not load applications: HTTP " + res.status + detail;
+      list.innerHTML = "";
+      return;
+    }
+    currentApps = await res.json();
+    status.textContent = currentApps.length + " " + currentListStatus + " application(s). Click a portrait to review.";
+    list.innerHTML = currentApps.map((a, i) => `
+      <button data-i="${i}" style="background:transparent; border:1px solid var(--border); border-radius:8px; padding:0.5rem; cursor:pointer; color:inherit; text-align:center;">
+        <img src="${a.portrait || ""}" alt="${a.name}" style="width:72px; height:72px; border-radius:6px; display:block;">
+        <span style="font-size:0.8rem; display:block; margin-top:0.3rem;">${a.name}</span>
+      </button>
+    `).join("") || "<p>No applications yet.</p>";
+    list.querySelectorAll("button[data-i]").forEach(btn => {
+      btn.addEventListener("click", () => showProfile(currentApps[Number(btn.dataset.i)]));
+    });
+  } catch (err) {
+    status.textContent = "Could not load applications: " + err.message;
+    list.innerHTML = "";
+  }
+}
+
+function setLoggedIn(on) {
+  document.querySelectorAll("#apply-btn, #sso-btn").forEach(el => el.style.display = on ? "none" : "");
+  const lo = document.getElementById("logout-link");
+  if (lo) lo.style.display = on ? "inline" : "none";
+}
+
+async function afterLogin(token, opts = {}) {
+  if (scopesNeedAuthorization(token)) {
+    sessionStorage.removeItem("access_token");
+    throw new Error("ESI permissions changed. Please log in again to authorize the requested scopes.");
+  }
+  currentToken = token;
+  sessionStorage.setItem("access_token", token);
+  setLoggedIn(true);
+  const meRes = await fetch("/me", { headers: { Authorization: "Bearer " + token } });
+  const me = await meRes.json();
+  if (me.is_leader) {
+    if (window.location.pathname === "/officers.html") document.getElementById("leaders").style.display = "block";
+    document.getElementById("corp-officers-link").style.display = "inline";
+
+    document.getElementById("leader-welcome").textContent = "Signed in as leader (character " + me.character_id + ").";
+    document.getElementById("pending-btn").onclick = () => loadPending("pending");
+    document.getElementById("declined-btn").onclick = () => loadPending("declined");
+    document.getElementById("apply-status").textContent = "Leader access granted.";
+    await loadApplicant(token, { submitApplication: false });
+    if (window.location.pathname === "/officers.html") {
+      document.getElementById("corp-officers").style.display = "block";
+      await Promise.all([loadPending(), loadCorpOfficers()]);
+    }
+  } else {
+    if (window.location.pathname === "/officers.html") { window.location.replace("/"); return; }
+    // Always refresh the applicant profile and current application decision.
+    // loadApplicant checks for an existing application before submitting a new one.
+    await loadApplicant(token);
+  }
+}
+
+document.getElementById("public-btn").addEventListener("click", async () => {
+  const status = document.getElementById("esi-status");
+  status.textContent = "Fetching public corporation data…";
+  try {
+    const res = await fetch("https://esi.evetech.net/latest/corporations/1000001/?datasource=tranquility");
+    const data = await res.json();
+    status.innerHTML = `<strong>${data.name || "Corp"}</strong> (ID 1000001)<br>Member count: ${data.member_count || "—"}<br>CEO: ${data.ceo_id || "—"}`;
+  } catch (e) {
+    status.textContent = "Could not reach ESI. Open https://esi.evetech.net/ui/ to explore endpoints.";
+  }
+});
+
+(async () => {
+  const params = new URLSearchParams(window.location.search);
+  const code = params.get("code");
+  if (code) {
+    document.getElementById("apply-status").textContent = "Authenticating…";
+    try {
+      const tokens = await exchangeCode(code);
+      await afterLogin(tokens.access_token);
+      history.replaceState({}, "", "/");
+    } catch (err) {
+      document.getElementById("apply-status").textContent = "Login failed: " + err.message + ". Check that the Callback URL in your ESI app matches this page exactly.";
+    }
+    document.body.classList.remove("session-booting");
+    return;
+  }
+  const saved = sessionStorage.getItem("access_token");
+  try {
+    const token = saved && sessionExpiryMs(saved) > Date.now() + 90000 ? saved : await refreshSession();
+    if (token) await afterLogin(token, { skipSubmit: true });
+  } catch (e) {
+    sessionStorage.removeItem("access_token");
+    document.getElementById("apply-status").textContent = e.message || "Please log in again.";
+  } finally {
+    document.body.classList.remove("session-booting");
+  }
+})();
+</script>
+
+</body>
+</html>
