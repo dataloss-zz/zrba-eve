@@ -125,9 +125,14 @@ body.profile-visible footer {
     margin-left: auto;
   }
 }
+body.session-booting header,
+body.session-booting .hero,
+body.session-booting section,
+body.session-booting footer { visibility: hidden; }
+body.session-booting #leader-panel { visibility: visible; }
 </style>
 </head>
-<body>
+<body class="session-booting">
 
 <header>
   <div class="logo-area">
@@ -857,8 +862,8 @@ async function afterLogin(token, opts = {}) {
     document.getElementById("pending-btn").onclick = () => loadPending("pending");
     document.getElementById("declined-btn").onclick = () => loadPending("declined");
     document.getElementById("apply-status").textContent = "Leader access granted.";
-    await loadPending();
     await loadApplicant(token, { submitApplication: false });
+    await loadPending();
   } else {
     // Always refresh the applicant profile and current application decision.
     // loadApplicant checks for an existing application before submitting a new one.
@@ -890,6 +895,7 @@ document.getElementById("public-btn").addEventListener("click", async () => {
     } catch (err) {
       document.getElementById("apply-status").textContent = "Login failed: " + err.message + ". Check that the Callback URL in your ESI app matches this page exactly.";
     }
+    document.body.classList.remove("session-booting");
     return;
   }
   const saved = sessionStorage.getItem("access_token");
@@ -899,6 +905,8 @@ document.getElementById("public-btn").addEventListener("click", async () => {
   } catch (e) {
     sessionStorage.removeItem("access_token");
     document.getElementById("apply-status").textContent = e.message || "Please log in again.";
+  } finally {
+    document.body.classList.remove("session-booting");
   }
 })();
 </script>
