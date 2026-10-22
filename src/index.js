@@ -405,7 +405,16 @@ export default {
         const characterResponse = await fetch("https://esi.evetech.net/latest/characters/" + id + "/");
         if (!characterResponse.ok) return Response.json({ error: "Character unavailable" }, { status: 502 });
         const character = await characterResponse.json();
-        if (character.corporation_id !== leader.corporation_id) return Response.json({ error: "Not a current corporation member" }, { status: 403 });
+        if (character.corporation_id !== leader.corporation_id) {
+          const pending = await env.APPLICATIONS.list({ prefix: "app:" + id + ":" });
+          let accepted = false;
+          for (const entry of pending.keys) {
+            const raw = await env.APPLICATIONS.get(entry.name);
+            if (!raw) continue;
+            try { if (JSON.parse(raw).status === "accepted") { accepted = true; break; } } catch {}
+          }
+          if (!accepted) return Response.json({ error: "Character is neither a corporation member nor an accepted applicant" }, { status: 403 });
+        }
         const read = async path => {
           try { const r = await fetch("https://esi.evetech.net/latest" + path); return r.ok ? await r.json() : null; }
           catch { return null; }
