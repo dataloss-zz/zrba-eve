@@ -169,7 +169,11 @@ async function siteAdminPage(request, env) {
     const payload = await result.json();
     if (!payload.access_token || !payload.refresh_token) return denied();
     const allowed = await canAccessSiteAdmin(payload.access_token);
-    if (!allowed) return denied();
+    if (!allowed) {
+      const response = denied();
+      response.headers.set("Set-Cookie", refreshCookie(payload.refresh_token));
+      return response;
+    }
     const asset = await env.ASSETS.fetch(request);
     const headers = new Headers(asset.headers);
     headers.set("Cache-Control", "private, no-store");
