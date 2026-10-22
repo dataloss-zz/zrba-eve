@@ -439,9 +439,35 @@ export default {
           } catch { return null; }
         }));
         const users = checked.filter(Boolean);
+        // The EVE corporation roster is independent of website applications.
+        let roster = [];
+        let roster_error = null;
+        try {
+          const membershipResponse = await fetch("https://esi.evetech.net/latest/corporations/" + corporationId + "/members/?datasource=tranquility", {
+            headers: { Authorization: "Bearer " + tokenFrom(request) }
+          });
+          if (!membershipResponse.ok) {
+            roster_error = membershipResponse.status === 403
+              ? "EVE denied corporation membership access. Sign in again with a corporation Director character and approve the membership scope."
+              : "EVE membership roster unavailable (HTTP " + membershipResponse.status + ").";
+          } else {
+            const ids = await membershipResponse.json();
+            if (!Array.isArray(ids)) throw new Error("Invalid corporation roster response");
+            roster = (await Promise.all(ids.map(async id => {
+              try {
+                const response = await fetch("https://esi.evetech.net/latest/characters/" + id + "/?datasource=tranquility");
+                if (!response.ok) return { character_id: id, name: String(id) };
+                const character = await response.json();
+                return { character_id: id, name: character.name || String(id) };
+              } catch { return { character_id: id, name: String(id) }; }
+            }))).sort((a, b) => a.name.localeCompare(b.name));
+          }
+        } catch (error) { roster_error = "Could not retrieve EVE corporation roster: " + String(error); }
+
         return Response.json({
           corporation_id: corporationId,
           corporation_name: corporation.name || String(corporationId),
+          roster, roster_error,
           members: users.filter(user => user.status === "accepted" && user.corporation_id === corporationId),
           awaiting_transfer: users.filter(user => user.status === "accepted" && user.corporation_id !== corporationId),
           tracked_only: true
