@@ -778,8 +778,9 @@ async function loadCorpOfficers() {
             const id = encodeURIComponent(user.character_id);
             const portrait = 'https://images.evetech.net/characters/' + id + '/portrait?size=128';
             return '<div style="text-align:center;border:1px solid var(--border);border-radius:7px;padding:0.65rem;min-width:0;">' +
+              '<button type="button" class="accepted-member-info" data-member-id="' + id + '" aria-label="View ESI profile for ' + name + '" style="display:block;width:100%;background:transparent;color:inherit;border:0;padding:0;cursor:pointer;">' +
               '<img src="' + portrait + '" alt="' + name + '" loading="lazy" style="width:96px;height:96px;max-width:100%;object-fit:cover;border-radius:6px;display:block;margin:0 auto 0.45rem;">' +
-              '<div style="font-size:0.9rem;font-weight:600;overflow-wrap:anywhere;">' + name + '</div>' +
+              '<div style="font-size:0.9rem;font-weight:600;overflow-wrap:anywhere;">' + name + '</div></button>' +
               '<button type="button" class="remove-member-btn" data-character-id="' + id + '" data-character-name="' + name + '" style="font-size:0.72rem;padding:0.2rem 0.45rem;margin-top:0.55rem;background:transparent;color:#ff9c9c;border:1px solid #a45a5a;border-radius:4px;cursor:pointer;">Remove from Corp</button>' +
               '</div>';
           }).join("") + '</div>'
@@ -787,6 +788,9 @@ async function loadCorpOfficers() {
     };
     render(data.members, "officers-members", "officers-member-count");
     render(data.awaiting_transfer, "officers-awaiting", "officers-awaiting-count");
+    document.querySelectorAll("#officers-members .accepted-member-info, #officers-awaiting .accepted-member-info").forEach(button => {
+      button.addEventListener("click", () => showMemberInfo(button.dataset.memberId));
+    });
     document.querySelectorAll("#officers-members .remove-member-btn, #officers-awaiting .remove-member-btn").forEach(button => {
       button.addEventListener("click", async () => {
         const characterId = button.dataset.characterId;
