@@ -493,6 +493,9 @@ async function loadApplicant(token, { submitApplication = true } = {}) {
 function renderApplicationStatus(application, leaders) {
   const box = document.getElementById("application-decision-status");
   if (!box) return;
+  const accepted = application?.status === "accepted";
+  const joinSection = document.getElementById("join");
+  if (joinSection) joinSection.style.display = accepted ? "none" : "";
   const statusPanel = document.getElementById("application-status-panel");
   if (statusPanel) statusPanel.style.display = application ? "block" : "none";
   if (!application) { box.innerHTML = ""; return; }
