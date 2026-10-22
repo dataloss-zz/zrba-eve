@@ -94,6 +94,7 @@ footer {
   margin-top: 2rem;
 }
 #esi-status { margin-top: 1rem; font-size: 0.9rem; color: var(--muted); }
+#hover-info-bar { position: fixed; left: 0; bottom: 0; z-index: 1000; max-width: min(90vw, 900px); padding: 0.25rem 0.6rem; background: rgba(8,10,15,0.96); color: #c9d0dc; border: 1px solid var(--border); border-left: 0; border-bottom: 0; border-radius: 0 5px 0 0; font: 12px/1.4 ui-monospace, SFMono-Regular, Consolas, monospace; overflow-wrap: anywhere; display: none; }
 </style>
 </head>
 <body>
@@ -197,6 +198,8 @@ footer {
     <div id="leader-detail" style="margin-top:1rem;"></div>
   </div>
 </section>
+
+<div id="hover-info-bar" aria-live="polite"></div>
 
 <footer>
   Zeta Reticuli Blackpill Alliance — EVE Online Corporation &nbsp;|&nbsp; Powered by ESI &nbsp;|&nbsp; Not affiliated with CCP Games
@@ -407,6 +410,31 @@ function escapeHtml(value) {
   return String(value).replace(/[&<>"\']/g, ch => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"' : "&quot;", "\'": "&#39;" }[ch]));
 }
 
+const hoverInfoBar = document.getElementById("hover-info-bar");
+function setHoverInfo(text) {
+  if (!hoverInfoBar) return;
+  hoverInfoBar.textContent = text || "";
+  hoverInfoBar.style.display = text ? "block" : "none";
+}
+document.querySelectorAll("a[href]").forEach(link => {
+  link.addEventListener("mouseenter", () => {
+    const href = link.href;
+    if (href && !href.endsWith("#")) setHoverInfo(href);
+  });
+  link.addEventListener("mouseleave", () => setHoverInfo(""));
+});
+document.querySelectorAll("button").forEach(button => {
+  button.addEventListener("mouseenter", () => {
+    const target = button.dataset.infoUrl;
+    if (target) setHoverInfo(target);
+    else if (button.id === "apply-btn" || button.id === "sso-btn") setHoverInfo("https://login.eveonline.com/v2/oauth/authorize");
+    else if (button.id === "public-btn") setHoverInfo("GET https://esi.evetech.net/latest/corporations/1000001/?datasource=tranquility");
+    else if (button.id === "pending-btn") setHoverInfo("GET /applications");
+    else if (button.id === "accept-application-btn" || button.id === "decline-application-btn") setHoverInfo("POST /application-decision");
+    else setHoverInfo("");
+  });
+  button.addEventListener("mouseleave", () => setHoverInfo(""));
+});
 document.getElementById("apply-btn").addEventListener("click", startLogin);
 document.getElementById("sso-btn").addEventListener("click", startLogin);
 document.getElementById("logout-link").addEventListener("click", (e) => {
@@ -419,7 +447,7 @@ document.getElementById("logout-link").addEventListener("click", (e) => {
 let currentToken = null;
 let currentApps = [];
 
-async async function showProfile(a) {
+async function showProfile(a) {
   const detail = document.getElementById("leader-detail");
   detail.innerHTML = "<p>Loading profile…</p>";
   const currentCorp = a.corporation && isNaN(Number(a.corporation)) ? a.corporation : await corpNameFor(a.corporation_id || a.corporation);
