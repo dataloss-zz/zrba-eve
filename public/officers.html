@@ -279,6 +279,10 @@ body.officer-page.session-booting #leaders, body.officer-page.session-booting #c
   </div>
 </section>
 
+<dialog id="member-info-dialog" style="width:min(740px,94vw);max-height:85vh;overflow:auto;background:var(--bg);color:inherit;border:1px solid var(--border);border-radius:9px;padding:1.2rem;">
+  <button id="member-info-close" type="button" class="btn btn-outline" style="float:right;">Close</button>
+  <div id="member-info-content"></div>
+</dialog>
 <div id="hover-info-bar" aria-live="polite"></div>
 
 <footer>
@@ -651,6 +655,50 @@ document.getElementById("logout-link").addEventListener("click", async (e) => {
   window.location.href = "/";
 });
 
+function memberDataHtml(value, depth = 0) {
+  if (value === null || value === undefined) return '<span style="color:var(--muted);">Not available</span>';
+  if (Array.isArray(value)) {
+    if (!value.length) return '<span style="color:var(--muted);">None</span>';
+    const items = value.map((entry, index) => '<div style="margin:0.35rem 0;padding-left:0.5rem;border-left:1px solid var(--border);">' +
+      (typeof entry === "object" && entry !== null ? memberDataHtml(entry, depth + 1) : memberDataHtml(entry, depth + 1)) + '</div>').join("");
+    return value.length > 3 ? '<details><summary style="cursor:pointer;">Show ' + value.length + ' entries</summary>' + items + '</details>' : items;
+  }
+  if (typeof value === "object") {
+    return Object.entries(value).map(([key, val]) => '<div style="margin:0.35rem 0;overflow-wrap:anywhere;"><strong>' +
+      escapeHtml(key.replaceAll("_", " ")) + ':</strong> ' + memberDataHtml(val, depth + 1) + '</div>').join("");
+  }
+  return escapeHtml(String(value));
+}
+async function showMemberInfo(id) {
+  const dialog = document.getElementById("member-info-dialog");
+  const content = document.getElementById("member-info-content");
+  content.textContent = "Loading EVE ESI character information…";
+  if (!dialog.open) dialog.showModal();
+  try {
+    const response = await fetch("/corp-officers/member?character_id=" + encodeURIComponent(id), {
+      headers: { Authorization: "Bearer " + currentToken }
+    });
+    const data = await response.json();
+    if (!response.ok) throw new Error(data.error || "Member information unavailable");
+    const name = data.character?.name || String(id);
+    const sections = [
+      ["Character information", data.character],
+      ["Portrait information", data.portrait],
+      ["Corporation history", data.corporation_history],
+      ["Website application records", data.applications]
+    ];
+    content.innerHTML = '<h3>' + escapeHtml(name) + '</h3>' +
+      '<img src="https://images.evetech.net/characters/' + encodeURIComponent(id) + '/portrait?size=128" alt="" style="width:96px;border-radius:6px;">' +
+      '<p style="color:var(--muted);font-size:0.85rem;">Public ESI character data and saved website applications. Private character data requires that character’s own authorization.</p>' +
+      sections.map(([title, value]) => '<section style="display:block;margin:0.8rem 0;padding:0.8rem;border:1px solid var(--border);border-radius:6px;">' +
+        '<h4>' + escapeHtml(title) + '</h4>' + memberDataHtml(value) + '</section>').join("");
+  } catch (error) { content.textContent = String(error); }
+}
+document.getElementById("member-info-close").addEventListener("click", () => document.getElementById("member-info-dialog").close());
+document.getElementById("member-info-dialog").addEventListener("click", event => {
+  if (event.target === event.currentTarget) event.currentTarget.close();
+});
+
 async function loadCorpOfficers() {
   const status = document.getElementById("officers-status");
   status.textContent = "Checking registered characters against ESI…";
@@ -701,11 +749,12 @@ async function loadCorpOfficers() {
       const draw = () => {
         grid.innerHTML = members.slice(page * 10, (page + 1) * 10).map(member => {
           const status = target === "officers-unknown" ? "Unknown" : online(member) ? "Online" : "Offline";
-          return '<div style="text-align:center;border:1px solid var(--border);border-radius:7px;padding:0.65rem;">' +
+          return '<button type="button" class="member-info-card" data-member-id="' + encodeURIComponent(member.character_id) + '" style="width:100%;cursor:pointer;background:transparent;color:inherit;text-align:center;border:1px solid var(--border);border-radius:7px;padding:0.65rem;">' +
             '<img src="https://images.evetech.net/characters/' + encodeURIComponent(member.character_id) + '/portrait?size=128" alt="' + escapeHtml(member.name) + '" loading="lazy" style="width:96px;height:96px;max-width:100%;border-radius:6px;display:block;margin:0 auto 0.45rem;">' +
             '<div style="font-weight:600;font-size:0.9rem;overflow-wrap:anywhere;">' + escapeHtml(member.name) + '</div>' +
-            '<div style="font-size:0.75rem;color:var(--muted);">' + status + '</div></div>';
+            '<div style="font-size:0.75rem;color:var(--muted);">' + status + '</div></button>';
         }).join("");
+        grid.querySelectorAll(".member-info-card").forEach(card => card.addEventListener("click", () => showMemberInfo(card.dataset.memberId)));
         previous.disabled = page === 0;
         next.disabled = (page + 1) * 10 >= members.length;
         indicator.textContent = (page * 10 + 1) + "–" + Math.min((page + 1) * 10, members.length) + " of " + members.length;
