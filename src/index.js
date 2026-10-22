@@ -1,7 +1,6 @@
 const CLIENT_ID = "f6080d22aeda4a90a3f20c5906d83037";
-const LEADER_IDS = new Set([
-  "1655394838", // datalost
-]);
+const LEADER_NAMES = { "1655394838": "datalost" };
+const LEADER_IDS = new Set(Object.keys(LEADER_NAMES));
 
 function cors() {
   return {
@@ -175,7 +174,7 @@ export default {
       apps.sort((a, b) => (b.submitted_at || "").localeCompare(a.submitted_at || ""));
       return new Response(JSON.stringify({
         application: apps[0] || null,
-        recruitment_leaders: ["datalost"],
+        recruitment_leaders: Object.entries(LEADER_NAMES).map(([id, name]) => ({ id, name })),
       }), { headers: { "Content-Type": "application/json", ...cors() } });
     }
 
@@ -197,9 +196,13 @@ export default {
           status: 404, headers: { "Content-Type": "application/json", ...cors() },
         });
         const application = JSON.parse(existing);
+        if ((application.status || "pending") !== "pending") return new Response(JSON.stringify({ error: "application is no longer pending" }), {
+          status: 409, headers: { "Content-Type": "application/json", ...cors() },
+        });
         application.status = body.status;
         application.decided_at = new Date().toISOString();
         application.decided_by = charId;
+        application.decided_by_name = LEADER_NAMES[charId];
         await env.APPLICATIONS.put(body.application_key, JSON.stringify(application));
         return new Response(JSON.stringify({ ok: true, status: application.status }), {
           headers: { "Content-Type": "application/json", ...cors() },
@@ -208,6 +211,56 @@ export default {
         return new Response(JSON.stringify({ error: String(err) }), {
           status: 400, headers: { "Content-Type": "application/json", ...cors() },
         });
+      }
+    }
+
+    if (url.pathname === "/application-discussion" && request.method === "POST") {
+      const charId = await charIdFromToken(tokenFrom(request));
+      if (!charId) return new Response(JSON.stringify({ error: "unauthorized" }), { status: 401, headers: { "Content-Type": "application/json", ...cors() } });
+      try {
+        const body = await request.json();
+        if (typeof body.summary !== "string" || body.summary.length > 1000 || !body.summary.trim() ||
+            typeof body.leader_id !== "string" || !LEADER_IDS.has(body.leader_id)) {
+          return new Response(JSON.stringify({ error: "choose a leader and enter a summary (maximum 1000 characters)" }), { status: 400, headers: { "Content-Type": "application/json", ...cors() } });
+        }
+        const list = await env.APPLICATIONS.list({ prefix: "app:" + charId + ":" });
+        const apps = [];
+        for (const k of list.keys) {
+          const value = await env.APPLICATIONS.get(k.name);
+          if (value) apps.push({ ...JSON.parse(value), application_key: k.name });
+        }
+        apps.sort((a, b) => (b.submitted_at || "").localeCompare(a.submitted_at || ""));
+        const application = apps[0];
+        if (!application || application.status !== "declined") return new Response(JSON.stringify({ error: "no declined application" }), { status: 409, headers: { "Content-Type": "application/json", ...cors() } });
+        application.discussion = { summary: body.summary.trim(), leader_id: body.leader_id, leader_name: LEADER_NAMES[body.leader_id], updated_at: new Date().toISOString() };
+        delete application.application_key;
+        await env.APPLICATIONS.put(apps[0].application_key, JSON.stringify(application));
+        return new Response(JSON.stringify({ ok: true, discussion: application.discussion }), { headers: { "Content-Type": "application/json", ...cors() } });
+      } catch {
+        return new Response(JSON.stringify({ error: "could not save discussion" }), { status: 400, headers: { "Content-Type": "application/json", ...cors() } });
+      }
+    }
+
+    if (url.pathname === "/application-review" && request.method === "POST") {
+      const charId = await charIdFromToken(tokenFrom(request));
+      if (!charId || !LEADER_IDS.has(charId)) return new Response(JSON.stringify({ error: "leaders only" }), { status: 403, headers: { "Content-Type": "application/json", ...cors() } });
+      try {
+        const body = await request.json();
+        if (typeof body.application_key !== "string" || !/^app:\d+:\d+$/.test(body.application_key)) return new Response(JSON.stringify({ error: "invalid application" }), { status: 400, headers: { "Content-Type": "application/json", ...cors() } });
+        const raw = await env.APPLICATIONS.get(body.application_key);
+        if (!raw) return new Response(JSON.stringify({ error: "application not found" }), { status: 404, headers: { "Content-Type": "application/json", ...cors() } });
+        const application = JSON.parse(raw);
+        if (application.status !== "declined") return new Response(JSON.stringify({ error: "application is not declined" }), { status: 409, headers: { "Content-Type": "application/json", ...cors() } });
+        application.status = "pending";
+        application.review_history = Array.isArray(application.review_history) ? application.review_history : [];
+        application.review_history.push({ leader_id: charId, leader_name: LEADER_NAMES[charId], reviewed_at: new Date().toISOString() });
+        application.reviewed_at = application.review_history[application.review_history.length - 1].reviewed_at;
+        application.reviewed_by = charId;
+        application.reviewed_by_name = LEADER_NAMES[charId];
+        await env.APPLICATIONS.put(body.application_key, JSON.stringify(application));
+        return new Response(JSON.stringify({ ok: true }), { headers: { "Content-Type": "application/json", ...cors() } });
+      } catch {
+        return new Response(JSON.stringify({ error: "could not reopen application" }), { status: 400, headers: { "Content-Type": "application/json", ...cors() } });
       }
     }
 
@@ -231,7 +284,8 @@ export default {
         const prev = latest.get(id);
         if (!prev || (a.submitted_at || "") > (prev.submitted_at || "")) latest.set(id, a);
       }
-      const unique = [...latest.values()].filter(a => (a.status || "pending") === "pending").sort((a, b) => (b.submitted_at || "").localeCompare(a.submitted_at || ""));
+      const requestedStatus = url.searchParams.get("status") === "declined" ? "declined" : "pending";
+      const unique = [...latest.values()].filter(a => (a.status || "pending") === requestedStatus).sort((a, b) => (b.submitted_at || "").localeCompare(a.submitted_at || ""));
       return new Response(JSON.stringify(unique), {
         headers: { "Content-Type": "application/json", ...cors() },
       });
