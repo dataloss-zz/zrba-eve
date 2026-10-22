@@ -7,5 +7,6 @@ directory = "./public"
 binding = "ASSETS"
 run_worker_first = ["/exchange", "/callback", "/applications"]
 
-# KV binding APPLICATIONS is set in the Cloudflare dashboard
-# (Workers & Pages → zrba-eve → Settings → Bindings)
+[[kv_namespaces]]
+binding = "APPLICATIONS"
+id = "932ead051c6b4618a42fe8ebe9d4d867"
