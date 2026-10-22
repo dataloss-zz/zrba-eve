@@ -48,7 +48,8 @@ async function charIdFromToken(token) {
     const now = Math.floor(Date.now() / 1000);
     if (!Number.isFinite(claims.exp) || claims.exp <= now) return null;
     if (!["https://login.eveonline.com/", "login.eveonline.com"].includes(claims.iss)) return null;
-    if (!Array.isArray(claims.aud) || !claims.aud.includes(CLIENT_ID) || !claims.aud.includes("EVE Online")) return null;
+    const audiences = Array.isArray(claims.aud) ? claims.aud : [claims.aud];
+    if (!audiences.includes(CLIENT_ID)) return null;
     if (typeof claims.sub !== "string" || !/^CHARACTER:EVE:\d+$/.test(claims.sub)) return null;
 
     const jwks = await getJwks();
