@@ -1,7 +1,7 @@
 const CLIENT_ID = "f6080d22aeda4a90a3f20c5906d83037";
 // Add leader character IDs here (as strings).
 const LEADER_IDS = new Set([
-  // "123456789",
+  "1655394838", // datalost
 ]);
 
 function cors() {
