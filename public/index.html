@@ -514,10 +514,10 @@ async function afterLogin(token, opts = {}) {
     document.getElementById("leader-welcome").textContent = "Signed in as leader (character " + me.character_id + ").";
     document.getElementById("pending-btn").onclick = loadPending;
     document.getElementById("apply-status").textContent = "Leader access granted.";
-  } else if (!opts.skipSubmit) {
-    await loadApplicant(token);
   } else {
-    document.getElementById("apply-status").textContent = "Signed in.";
+    // Always refresh the applicant profile and current application decision.
+    // loadApplicant checks for an existing application before submitting a new one.
+    await loadApplicant(token);
   }
 }
 
