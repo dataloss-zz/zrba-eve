@@ -49,7 +49,7 @@ async function charIdFromToken(token) {
     if (!Number.isFinite(claims.exp) || claims.exp <= now) return null;
     if (!["https://login.eveonline.com/", "login.eveonline.com"].includes(claims.iss)) return null;
     if (!Array.isArray(claims.aud) || !claims.aud.includes(CLIENT_ID) || !claims.aud.includes("EVE Online")) return null;
-    if (typeof claims.sub !== "string" || !/^CHARACTER:EVE:\\d+$/.test(claims.sub)) return null;
+    if (typeof claims.sub !== "string" || !/^CHARACTER:EVE:\d+$/.test(claims.sub)) return null;
 
     const jwks = await getJwks();
     const jwk = jwks.keys.find(key => key.kid === header.kid && key.alg === "RS256" && key.kty === "RSA");
