@@ -313,6 +313,64 @@ export default {
       }
     }
 
+    if (url.pathname === "/corp-officers" && request.method === "GET") {
+      const viewerId = await charIdFromToken(tokenFrom(request));
+      if (!viewerId || !LEADER_IDS.has(viewerId)) {
+        return Response.json({ error: "leaders only" }, { status: 403 });
+      }
+      try {
+        const leaderResponse = await fetch("https://esi.evetech.net/latest/characters/1655394838/?datasource=tranquility");
+        if (!leaderResponse.ok) throw new Error("Could not retrieve datalost's corporation");
+        const leader = await leaderResponse.json();
+        const corporationId = leader.corporation_id;
+        const corporationResponse = await fetch("https://esi.evetech.net/latest/corporations/" + corporationId + "/?datasource=tranquility");
+        const corporation = corporationResponse.ok ? await corporationResponse.json() : {};
+        const records = [];
+        let cursor;
+        do {
+          const page = await env.APPLICATIONS.list({ prefix: "app:", cursor });
+          const batch = await Promise.all(page.keys.map(async entry => {
+            const raw = await env.APPLICATIONS.get(entry.name);
+            if (!raw) return null;
+            try { return JSON.parse(raw); } catch { return null; }
+          }));
+          records.push(...batch.filter(Boolean));
+          cursor = page.list_complete ? undefined : page.cursor;
+        } while (cursor);
+        const latest = new Map();
+        for (const record of records) {
+          const id = String(record.character_id || "");
+          const previous = latest.get(id);
+          if (id && (!previous || (record.submitted_at || "") > (previous.submitted_at || ""))) latest.set(id, record);
+        }
+        const checked = await Promise.all([...latest.values()].map(async record => {
+          const id = Number(record.character_id);
+          if (!Number.isSafeInteger(id) || id <= 0) return null;
+          try {
+            const response = await fetch("https://esi.evetech.net/latest/characters/" + id + "/?datasource=tranquility");
+            if (!response.ok) return null;
+            const character = await response.json();
+            return {
+              character_id: id,
+              name: character.name || record.name || String(id),
+              corporation_id: character.corporation_id,
+              status: record.status || "pending"
+            };
+          } catch { return null; }
+        }));
+        const users = checked.filter(Boolean);
+        return Response.json({
+          corporation_id: corporationId,
+          corporation_name: corporation.name || String(corporationId),
+          members: users.filter(user => user.corporation_id === corporationId),
+          awaiting_transfer: users.filter(user => user.status === "accepted" && user.corporation_id !== corporationId),
+          tracked_only: true
+        }, { headers: { "Cache-Control": "no-store" } });
+      } catch (error) {
+        return Response.json({ error: String(error) }, { status: 502 });
+      }
+    }
+
     if (url.pathname === "/applications" && request.method === "GET") {
       const charId = await charIdFromToken(tokenFrom(request));
       if (!charId || !LEADER_IDS.has(charId)) {
