@@ -251,6 +251,7 @@ export default {
         if (!raw) return new Response(JSON.stringify({ error: "application not found" }), { status: 404, headers: { "Content-Type": "application/json", ...cors() } });
         const application = JSON.parse(raw);
         if (application.status !== "declined") return new Response(JSON.stringify({ error: "application is not declined" }), { status: 409, headers: { "Content-Type": "application/json", ...cors() } });
+        if (!application.discussion || !application.discussion.summary || !LEADER_IDS.has(String(application.discussion.leader_id))) return new Response(JSON.stringify({ error: "applicant must submit a discussion summary and select a leader before review" }), { status: 409, headers: { "Content-Type": "application/json", ...cors() } });
         application.status = "pending";
         application.review_history = Array.isArray(application.review_history) ? application.review_history : [];
         application.review_history.push({ leader_id: charId, leader_name: LEADER_NAMES[charId], reviewed_at: new Date().toISOString() });
