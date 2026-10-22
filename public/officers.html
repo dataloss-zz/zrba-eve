@@ -140,6 +140,8 @@ body.officer-page #join { display: none !important; }
 body.officer-page #leaders,
 body.officer-page #corp-officers { padding-top: 1.6rem; padding-bottom: 0.5rem; }
 body.officer-page #corp-officers { padding-bottom: 3rem; }
+body.officer-page #leaders, body.officer-page #corp-officers { display: block !important; }
+body.officer-page.session-booting #leaders, body.officer-page.session-booting #corp-officers { visibility: hidden; }
 
 </style>
 </head>
@@ -151,9 +153,11 @@ body.officer-page #corp-officers { padding-bottom: 3rem; }
     <h1><span>Zeta</span> Reticuli <small style="color:#8a8f99;font-size:0.75rem;font-weight:400;">[ZRBA]</small></h1>
   </div>
   <nav>
-    <a href="/">Main Site</a>
-    <a href="#leaders">Recruitment</a>
-    <a href="#corp-officers" id="corp-officers-link" style="display:none;">Corp Officers</a>
+    <a href="/#mission">Mission</a>
+    <a href="/#comms">Communications</a>
+    <a href="/#esi">ESI / API</a>
+    <a href="/#join">Join</a>
+    <a href="/officers.html" id="corp-officers-link" style="display:none;">Corp Officers</a>
     <a href="#" id="logout-link" style="display:none;">Logout</a>
   </nav>
 </header>
@@ -868,11 +872,8 @@ async function afterLogin(token, opts = {}) {
     document.getElementById("pending-btn").onclick = () => loadPending("pending");
     document.getElementById("declined-btn").onclick = () => loadPending("declined");
     document.getElementById("apply-status").textContent = "Leader access granted.";
-    await loadApplicant(token, { submitApplication: false });
-    if (window.location.pathname === "/officers.html") {
-      document.getElementById("corp-officers").style.display = "block";
-      await Promise.all([loadPending(), loadCorpOfficers()]);
-    }
+    document.getElementById("corp-officers").style.display = "block";
+    await Promise.allSettled([loadPending(), loadCorpOfficers(), loadApplicant(token, { submitApplication: false })]);
   } else {
     if (window.location.pathname === "/officers.html") { window.location.replace("/"); return; }
     // Always refresh the applicant profile and current application decision.
