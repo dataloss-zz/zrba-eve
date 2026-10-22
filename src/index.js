@@ -200,6 +200,8 @@ export default {
           status: 409, headers: { "Content-Type": "application/json", ...cors() },
         });
         application.status = body.status;
+        // Each new decline starts a fresh discussion cycle; retain the review audit history.
+        if (body.status === "declined") delete application.discussion;
         application.decided_at = new Date().toISOString();
         application.decided_by = charId;
         application.decided_by_name = LEADER_NAMES[charId];
