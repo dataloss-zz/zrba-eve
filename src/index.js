@@ -1,5 +1,4 @@
 const CLIENT_ID = "f6080d22aeda4a90a3f20c5906d83037";
-// Add leader character IDs here (as strings).
 const LEADER_IDS = new Set([
   "1655394838", // datalost
 ]);
@@ -117,8 +116,14 @@ export default {
         const val = await env.APPLICATIONS.get(k.name);
         if (val) apps.push(JSON.parse(val));
       }
-      apps.sort((a, b) => (b.submitted_at || "").localeCompare(a.submitted_at || ""));
-      return new Response(JSON.stringify(apps), {
+      const latest = new Map();
+      for (const a of apps) {
+        const id = String(a.character_id || "");
+        const prev = latest.get(id);
+        if (!prev || (a.submitted_at || "") > (prev.submitted_at || "")) latest.set(id, a);
+      }
+      const unique = [...latest.values()].sort((a, b) => (b.submitted_at || "").localeCompare(a.submitted_at || ""));
+      return new Response(JSON.stringify(unique), {
         headers: { "Content-Type": "application/json", ...cors() },
       });
     }
