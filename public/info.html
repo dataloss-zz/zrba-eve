@@ -145,6 +145,7 @@ body.info-page .hero, body.info-page #mission, body.info-page #comms, body.info-
 body.info-page #esi { display: block !important; margin: 0 auto; padding-top: 2rem; }
 body.info-page footer { margin-left: 0 !important; }
 body.info-page #esi { margin-left: auto !important; }
+.site-admin-link { position: fixed; right: 14px; bottom: 10px; z-index: 1001; font-size: 0.8rem; color: var(--muted); background: var(--bg); border: 1px solid var(--border); border-radius: 5px; padding: 0.25rem 0.55rem; }
 </style>
 </head>
 <body class="info-page">
@@ -157,7 +158,6 @@ body.info-page #esi { margin-left: auto !important; }
   <nav>
     <a href="/#mission">Mission</a>
     <a href="/#comms">Communications</a>
-    <a href="/info.html">ESI / API</a>
     <a href="/#join">Join</a>
     <a href="/officers.html" id="corp-officers-link" style="display:none;">Corp Officers</a>
     <a href="#" id="logout-link" style="display:none;">Logout</a>
@@ -275,6 +275,7 @@ body.info-page #esi { margin-left: auto !important; }
 <footer>
   Zeta Reticuli Blackpill Alliance — EVE Online Corporation &nbsp;|&nbsp; Powered by ESI &nbsp;|&nbsp; Not affiliated with CCP Games
 </footer>
+<a class="site-admin-link" href="/info.html">Site.Admin</a>
 
 <script>
 const CLIENT_ID = "f6080d22aeda4a90a3f20c5906d83037";
