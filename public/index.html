@@ -544,6 +544,7 @@ document.getElementById("apply-btn").addEventListener("click", startLogin);
 document.getElementById("sso-btn").addEventListener("click", startLogin);
 document.getElementById("logout-link").addEventListener("click", async (e) => {
   e.preventDefault();
+  if (declinedSummaryPoll) clearInterval(declinedSummaryPoll);
   sessionStorage.removeItem("access_token");
   sessionStorage.removeItem("pkce_verifier");
   await fetch("/logout", { method: "POST", credentials: "same-origin" }).catch(() => {});
@@ -553,8 +554,53 @@ document.getElementById("logout-link").addEventListener("click", async (e) => {
 let currentToken = null;
 let currentApps = [];
 let currentListStatus = "pending";
+let declinedSummaryPoll = null;
+let selectedApplicationKey = null;
+function updateDeclinedSummaryPolling() {
+  if (declinedSummaryPoll) clearInterval(declinedSummaryPoll);
+  declinedSummaryPoll = null;
+  if (currentListStatus !== "declined" || document.getElementById("leaders").style.display === "none") return;
+  declinedSummaryPoll = setInterval(async () => {
+    if (document.hidden || currentListStatus !== "declined") return;
+    try {
+      const response = await fetch("/applications?status=declined", {
+        headers: { Authorization: "Bearer " + currentToken }
+      });
+      if (!response.ok) return;
+      const updated = await response.json();
+      const previous = currentApps;
+      const previousSelected = previous.find(a => a.application_key === selectedApplicationKey);
+      const updatedSelected = updated.find(a => a.application_key === selectedApplicationKey);
+      const summaryChanged = previousSelected && updatedSelected &&
+        JSON.stringify(previousSelected.discussion || null) !== JSON.stringify(updatedSelected.discussion || null);
+      const listChanged = previous.length !== updated.length ||
+        previous.some((a, i) => a.application_key !== updated[i]?.application_key);
+      currentApps = updated;
+      if (listChanged) {
+        const list = document.getElementById("leader-list");
+        list.innerHTML = updated.map((a, i) => `
+          <button data-i="${i}" style="background:transparent; border:1px solid var(--border); border-radius:8px; padding:0.5rem; cursor:pointer; color:inherit; text-align:center;">
+            <img src="${a.portrait || ""}" alt="${escapeHtml(a.name || "")}" style="width:72px; height:72px; border-radius:6px; display:block;">
+            <span style="font-size:0.8rem; display:block; margin-top:0.3rem;">${escapeHtml(a.name || "")}</span>
+          </button>`).join("") || "<p>No applications yet.</p>";
+        list.querySelectorAll("button[data-i]").forEach(btn => {
+          btn.addEventListener("click", () => showProfile(currentApps[Number(btn.dataset.i)]));
+        });
+        document.getElementById("leader-status").textContent = updated.length + " declined application(s). Click a portrait to review.";
+      }
+      if (summaryChanged && selectedApplicationKey === updatedSelected.application_key) {
+        await showProfile(updatedSelected, false);
+      } else if (previousSelected && !updatedSelected) {
+        selectedApplicationKey = null;
+        document.getElementById("leader-detail").innerHTML = "";
+      }
+    } catch (error) { /* Keep the existing dashboard when a background check fails. */ }
+  }, 10000);
+}
 
-async function showProfile(a) {
+
+async function showProfile(a, scroll = true) {
+  selectedApplicationKey = a.application_key;
   const detail = document.getElementById("leader-detail");
   detail.innerHTML = "<p>Loading profile…</p>";
   const currentCorp = a.corporation && isNaN(Number(a.corporation)) ? a.corporation : await corpNameFor(a.corporation_id || a.corporation);
@@ -591,7 +637,7 @@ async function showProfile(a) {
   if (declineBtn) declineBtn.onclick = () => decideApplication(a, "declined");
   const reviewBtn = document.getElementById("review-application-btn");
   if (reviewBtn) reviewBtn.onclick = () => reopenApplication(a);
-  detail.scrollIntoView({ behavior: "smooth" });
+  if (scroll) detail.scrollIntoView({ behavior: "smooth" });
 }
 
 async function decideApplication(application, statusValue) {
@@ -632,6 +678,8 @@ async function reopenApplication(application) {
 
 async function loadPending(type = "pending") {
   currentListStatus = type === "declined" ? "declined" : "pending";
+  selectedApplicationKey = null;
+  updateDeclinedSummaryPolling();
   const status = document.getElementById("leader-status");
   const list = document.getElementById("leader-list");
   status.textContent = "Loading " + currentListStatus + " applications…";
