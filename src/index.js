@@ -11,11 +11,64 @@ function cors() {
   };
 }
 
-function charIdFromToken(token) {
+let jwksCache = null;
+let jwksCacheExpiresAt = 0;
+
+function decodeBase64Url(value) {
+  const normalized = value.replace(/-/g, "+").replace(/_/g, "/");
+  return atob(normalized + "=".repeat((4 - normalized.length % 4) % 4));
+}
+
+async function getJwks() {
+  if (jwksCache && Date.now() < jwksCacheExpiresAt) return jwksCache;
+  const metadataRes = await fetch("https://login.eveonline.com/.well-known/oauth-authorization-server");
+  if (!metadataRes.ok) throw new Error("EVE SSO metadata unavailable");
+  const metadata = await metadataRes.json();
+  if (typeof metadata.jwks_uri !== "string" || !metadata.jwks_uri.startsWith("https://login.eveonline.com/")) {
+    throw new Error("Invalid EVE SSO JWKS endpoint");
+  }
+  const jwksRes = await fetch(metadata.jwks_uri);
+  if (!jwksRes.ok) throw new Error("EVE SSO signing keys unavailable");
+  const jwks = await jwksRes.json();
+  if (!Array.isArray(jwks.keys)) throw new Error("Invalid EVE SSO signing keys");
+  jwksCache = jwks;
+  jwksCacheExpiresAt = Date.now() + 5 * 60 * 1000;
+  return jwksCache;
+}
+
+async function charIdFromToken(token) {
   try {
-    const payload = token.split(".")[1];
-    const claims = JSON.parse(atob(payload.replace(/-/g, "+").replace(/_/g, "/")));
-    return String(claims.sub || "").split(":").pop();
+    if (typeof token !== "string") return null;
+    const parts = token.split(".");
+    if (parts.length !== 3) return null;
+    const header = JSON.parse(decodeBase64Url(parts[0]));
+    const claims = JSON.parse(decodeBase64Url(parts[1]));
+    if (header.alg !== "RS256" || typeof header.kid !== "string") return null;
+
+    const now = Math.floor(Date.now() / 1000);
+    if (!Number.isFinite(claims.exp) || claims.exp <= now) return null;
+    if (!["https://login.eveonline.com/", "login.eveonline.com"].includes(claims.iss)) return null;
+    if (!Array.isArray(claims.aud) || !claims.aud.includes(CLIENT_ID) || !claims.aud.includes("EVE Online")) return null;
+    if (typeof claims.sub !== "string" || !/^CHARACTER:EVE:\\d+$/.test(claims.sub)) return null;
+
+    const jwks = await getJwks();
+    const jwk = jwks.keys.find(key => key.kid === header.kid && key.alg === "RS256" && key.kty === "RSA");
+    if (!jwk) {
+      jwksCache = null;
+      jwksCacheExpiresAt = 0;
+      return null;
+    }
+    const publicKey = await crypto.subtle.importKey(
+      "jwk",
+      jwk,
+      { name: "RSASSA-PKCS1-v1_5", hash: "SHA-256" },
+      false,
+      ["verify"]
+    );
+    const signature = Uint8Array.from(decodeBase64Url(parts[2]), ch => ch.charCodeAt(0));
+    const signedData = new TextEncoder().encode(parts[0] + "." + parts[1]);
+    const validSignature = await crypto.subtle.verify("RSASSA-PKCS1-v1_5", publicKey, signature, signedData);
+    return validSignature ? claims.sub.split(":").pop() : null;
   } catch {
     return null;
   }
@@ -64,7 +117,7 @@ export default {
     }
 
     if (url.pathname === "/me" && request.method === "GET") {
-      const charId = charIdFromToken(tokenFrom(request));
+      const charId = await charIdFromToken(tokenFrom(request));
       if (!charId) {
         return new Response(JSON.stringify({ error: "unauthorized" }), {
           status: 401,
@@ -79,7 +132,7 @@ export default {
 
     if (url.pathname === "/applications" && request.method === "POST") {
       try {
-        const charId = charIdFromToken(tokenFrom(request));
+        const charId = await charIdFromToken(tokenFrom(request));
         if (!charId) {
           return new Response(JSON.stringify({ error: "unauthorized" }), {
             status: 401,
@@ -106,7 +159,7 @@ export default {
     }
 
     if (url.pathname === "/application-status" && request.method === "GET") {
-      const charId = charIdFromToken(tokenFrom(request));
+      const charId = await charIdFromToken(tokenFrom(request));
       if (!charId) return new Response(JSON.stringify({ error: "unauthorized" }), {
         status: 401, headers: { "Content-Type": "application/json", ...cors() },
       });
@@ -124,7 +177,7 @@ export default {
     }
 
     if (url.pathname === "/application-decision" && request.method === "POST") {
-      const charId = charIdFromToken(tokenFrom(request));
+      const charId = await charIdFromToken(tokenFrom(request));
       if (!charId || !LEADER_IDS.has(charId)) return new Response(JSON.stringify({ error: "leaders only" }), {
         status: 403, headers: { "Content-Type": "application/json", ...cors() },
       });
@@ -156,7 +209,7 @@ export default {
     }
 
     if (url.pathname === "/applications" && request.method === "GET") {
-      const charId = charIdFromToken(tokenFrom(request));
+      const charId = await charIdFromToken(tokenFrom(request));
       if (!charId || !LEADER_IDS.has(charId)) {
         return new Response(JSON.stringify({ error: "leaders only" }), {
           status: 403,
