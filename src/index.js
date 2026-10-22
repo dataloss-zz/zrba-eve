@@ -232,9 +232,11 @@ export default {
         apps.sort((a, b) => (b.submitted_at || "").localeCompare(a.submitted_at || ""));
         const application = apps[0];
         if (!application || application.status !== "declined") return new Response(JSON.stringify({ error: "no declined application" }), { status: 409, headers: { "Content-Type": "application/json", ...cors() } });
+        if (application.discussion?.summary) return new Response(JSON.stringify({ error: "discussion summary already submitted" }), { status: 409, headers: { "Content-Type": "application/json", ...cors() } });
+        const applicationKey = application.application_key;
         application.discussion = { summary: body.summary.trim(), leader_id: body.leader_id, leader_name: LEADER_NAMES[body.leader_id], updated_at: new Date().toISOString() };
         delete application.application_key;
-        await env.APPLICATIONS.put(apps[0].application_key, JSON.stringify(application));
+        await env.APPLICATIONS.put(applicationKey, JSON.stringify(application));
         return new Response(JSON.stringify({ ok: true, discussion: application.discussion }), { headers: { "Content-Type": "application/json", ...cors() } });
       } catch {
         return new Response(JSON.stringify({ error: "could not save discussion" }), { status: 400, headers: { "Content-Type": "application/json", ...cors() } });
