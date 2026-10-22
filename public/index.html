@@ -348,7 +348,7 @@ async function corpNameFor(id) {
   return corpNameCache[id];
 }
 
-async function loadApplicant(token) {
+async function loadApplicant(token, { submitApplication = true } = {}) {
   const claims = parseJwt(token);
   const charId = claims.sub.split(":").pop();
   let existingApplication = null;
@@ -398,11 +398,13 @@ async function loadApplicant(token) {
     <p>Contacts: ${contactCount}</p>
     <p>Medals: ${medalCount}</p>
     <p>Jump fatigue: ${fatigue && fatigue.jump_fatigue_expire_date ? fatigue.jump_fatigue_expire_date : "—"}</p>
-    <p style="margin-top:0.6rem;"><strong>Corporation history</strong></p>
-    <ul>${namedHistory.slice(0, 8).map(h => `<li>${h.corporation_name || h.corporation_id} — joined ${h.start_date ? h.start_date.slice(0,10) : "?"}</li>`).join("") || "<li>None</li>"}</ul>
+    <details style="margin-top:0.6rem;border:1px solid var(--border);border-radius:6px;padding:0.7rem;">
+      <summary style="cursor:pointer;font-weight:600;">Corporation history</summary>
+      <ul style="margin-top:0.6rem;">${namedHistory.slice(0, 8).map(h => `<li>${h.corporation_name || h.corporation_id} — joined ${h.start_date ? h.start_date.slice(0,10) : "?"}</li>`).join("") || "<li>None</li>"}</ul>
+    </details>
   `;
-  document.getElementById("apply-status").textContent = existingApplication ? "Your application status is shown above your profile." : "Submitting your application…";
-  if (!existingApplication) try {
+  document.getElementById("apply-status").textContent = existingApplication ? "Your application status is shown above your profile." : (submitApplication ? "Submitting your application…" : "Your character profile is shown below.");
+  if (!existingApplication && submitApplication) try {
     const submitRes = await fetch("/applications", {
       method: "POST",
       headers: {
@@ -792,6 +794,7 @@ async function afterLogin(token, opts = {}) {
     document.getElementById("declined-btn").onclick = () => loadPending("declined");
     document.getElementById("apply-status").textContent = "Leader access granted.";
     await loadPending();
+    await loadApplicant(token, { submitApplication: false });
   } else {
     // Always refresh the applicant profile and current application decision.
     // loadApplicant checks for an existing application before submitting a new one.
