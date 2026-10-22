@@ -182,6 +182,7 @@ footer {
   </div>
   <div class="card" id="leader-panel" style="margin-top:1rem; display:none;">
     <h4>Your submitted profile</h4>
+    <div id="application-decision-status" style="margin-bottom:1rem;"></div>
     <div id="applicant-info"></div>
   </div>
 </section>
@@ -294,6 +295,15 @@ async function corpNameFor(id) {
 async function loadApplicant(token) {
   const claims = parseJwt(token);
   const charId = claims.sub.split(":").pop();
+  let existingApplication = null;
+  try {
+    const statusRes = await fetch("/application-status", { headers: { Authorization: "Bearer " + token } });
+    if (statusRes.ok) {
+      const statusData = await statusRes.json();
+      existingApplication = statusData.application || null;
+      renderApplicationStatus(existingApplication, statusData.recruitment_leaders || []);
+    }
+  } catch (e) {}
   const scopes = grantedScopes(claims);
   const has = (s) => scopes.has(s);
   const [char, portrait, history, killmails, contacts, loyalty, medals, standings, roles, fatigue, notifications, titles, fw, freelance] = await Promise.all([
@@ -335,9 +345,9 @@ async function loadApplicant(token) {
     <p style="margin-top:0.6rem;"><strong>Corporation history</strong></p>
     <ul>${namedHistory.slice(0, 8).map(h => `<li>${h.corporation_name || h.corporation_id} — joined ${h.start_date ? h.start_date.slice(0,10) : "?"}</li>`).join("") || "<li>None</li>"}</ul>
   `;
-  document.getElementById("apply-status").textContent = "Application submitted with extended ESI data.";
-  try {
-    await fetch("/applications", {
+  document.getElementById("apply-status").textContent = existingApplication ? "Your application status is shown above your profile." : "Submitting your application…";
+  if (!existingApplication) try {
+    const submitRes = await fetch("/applications", {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
@@ -366,7 +376,35 @@ async function loadApplicant(token) {
         granted_scopes: [...scopes]
       })
     });
-  } catch (e) {}
+    if (submitRes.ok) {
+      const statusRes = await fetch("/application-status", { headers: { Authorization: "Bearer " + token } });
+      if (statusRes.ok) {
+        const statusData = await statusRes.json();
+        renderApplicationStatus(statusData.application || null, statusData.recruitment_leaders || []);
+      }
+      document.getElementById("apply-status").textContent = "Application submitted and pending review.";
+    } else {
+      document.getElementById("apply-status").textContent = "Could not submit your application. Please try again.";
+    }
+  } catch (e) { document.getElementById("apply-status").textContent = "Could not submit your application. Please try again."; }
+}
+
+function renderApplicationStatus(application, leaders) {
+  const box = document.getElementById("application-decision-status");
+  if (!box) return;
+  if (!application) { box.innerHTML = ""; return; }
+  if (application.status === "accepted") {
+    box.innerHTML = '<p style="border:1px solid #347b53; padding:0.8rem; border-radius:6px; color:#8fe0ad;"><strong>Application Status: Accepted</strong></p>';
+  } else if (application.status === "declined") {
+    const list = leaders.map(name => '<li>' + escapeHtml(name) + '</li>').join("");
+    box.innerHTML = '<div style="border:1px solid #9b4242; padding:0.8rem; border-radius:6px;"><p style="color:#ff9b9b;"><strong>Application Status: Declined</strong></p><p style="margin-top:0.5rem;">If you are declined, please contact one of the recruitment leaders from this list.</p><ul style="margin-top:0.4rem;">' + (list || "<li>Recruitment leader list not configured.</li>") + '</ul></div>';
+  } else {
+    box.innerHTML = '<p style="border:1px solid var(--border); padding:0.8rem; border-radius:6px;"><strong>Application Status: Pending review</strong></p>';
+  }
+}
+
+function escapeHtml(value) {
+  return String(value).replace(/[&<>"\']/g, ch => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"' : "&quot;", "\'": "&#39;" }[ch]));
 }
 
 document.getElementById("apply-btn").addEventListener("click", startLogin);
@@ -392,7 +430,11 @@ async function showProfile(a) {
   }
   detail.innerHTML = `
     <div class="card">
-      <img src="${a.portrait || ""}" alt="" style="border-radius:6px; width:96px; height:96px;">
+      <img src="${a.portrait || ""}" alt="" style="border-radius:6px; width:96px; height:96px; display:block;">
+      <div style="display:flex; gap:0.6rem; margin:0.6rem 0 1rem;">
+        <button class="btn" id="accept-application-btn" style="background:#347b53;color:#fff;">Accept</button>
+        <button class="btn" id="decline-application-btn" style="background:#9b4242;color:#fff;">Decline</button>
+      </div>
       <h4 style="margin-top:0.6rem;">${a.name}</h4>
       <p>Character ID: ${a.character_id}</p>
       <p>Corporation: ${currentCorp}</p>
@@ -406,7 +448,30 @@ async function showProfile(a) {
       <ul>${hist.join("") || "<li>None</li>"}</ul>
     </div>
   `;
+  const acceptBtn = document.getElementById("accept-application-btn");
+  const declineBtn = document.getElementById("decline-application-btn");
+  if (acceptBtn) acceptBtn.onclick = () => decideApplication(a, "accepted");
+  if (declineBtn) declineBtn.onclick = () => decideApplication(a, "declined");
   detail.scrollIntoView({ behavior: "smooth" });
+}
+
+async function decideApplication(application, statusValue) {
+  const status = document.getElementById("leader-status");
+  status.textContent = "Saving decision…";
+  try {
+    const res = await fetch("/application-decision", {
+      method: "POST",
+      headers: { "Content-Type": "application/json", Authorization: "Bearer " + currentToken },
+      body: JSON.stringify({ application_key: application.application_key, status: statusValue })
+    });
+    const result = await res.json();
+    if (!res.ok) throw new Error(result.error || "Decision failed");
+    document.getElementById("leader-detail").innerHTML = "";
+    status.textContent = "Application " + statusValue + ".";
+    await loadPending();
+  } catch (err) {
+    status.textContent = "Could not save decision: " + err.message;
+  }
 }
 
 async function loadPending() {
