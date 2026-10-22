@@ -393,6 +393,37 @@ export default {
       }
     }
 
+    if (url.pathname === "/corp-officers/member" && request.method === "GET") {
+      const viewerId = await charIdFromToken(tokenFrom(request));
+      if (!viewerId || !LEADER_IDS.has(viewerId)) return Response.json({ error: "leaders only" }, { status: 403 });
+      const id = Number(url.searchParams.get("character_id"));
+      if (!Number.isSafeInteger(id) || id <= 0) return Response.json({ error: "invalid character" }, { status: 400 });
+      try {
+        const leaderResponse = await fetch("https://esi.evetech.net/latest/characters/1655394838/");
+        if (!leaderResponse.ok) throw new Error("Corporation lookup unavailable");
+        const leader = await leaderResponse.json();
+        const characterResponse = await fetch("https://esi.evetech.net/latest/characters/" + id + "/");
+        if (!characterResponse.ok) return Response.json({ error: "Character unavailable" }, { status: 502 });
+        const character = await characterResponse.json();
+        if (character.corporation_id !== leader.corporation_id) return Response.json({ error: "Not a current corporation member" }, { status: 403 });
+        const read = async path => {
+          try { const r = await fetch("https://esi.evetech.net/latest" + path); return r.ok ? await r.json() : null; }
+          catch { return null; }
+        };
+        const [history, portrait] = await Promise.all([
+          read("/characters/" + id + "/corporationhistory/"),
+          read("/characters/" + id + "/portrait/")
+        ]);
+        const keys = await env.APPLICATIONS.list({ prefix: "app:" + id + ":" });
+        const applications = (await Promise.all(keys.keys.map(async key => {
+          try { const raw = await env.APPLICATIONS.get(key.name); return raw ? JSON.parse(raw) : null; }
+          catch { return null; }
+        }))).filter(Boolean);
+        const safeApplications = applications.map(({ access_token, refresh_token, ...record }) => record);
+        return Response.json({ character, portrait, corporation_history: history || [], applications: safeApplications }, { headers: { "Cache-Control": "no-store" } });
+      } catch (error) { return Response.json({ error: String(error) }, { status: 502 }); }
+    }
+
     if (url.pathname === "/corp-officers" && request.method === "GET") {
       const viewerId = await charIdFromToken(tokenFrom(request));
       if (!viewerId || !LEADER_IDS.has(viewerId)) {
