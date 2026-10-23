@@ -399,18 +399,51 @@ async function exchangeCode(code) {
   return res.json();
 }
 
+const SESSION_CACHE_PREFIX = "zrba_cache_v1:";
+const CACHE_TTL = { "/me": 300000, "/site-admin-access": 120000, "/application-status": 60000, "/corp-officers": 300000 };
+function sessionCacheIdentity(token) {
+  try { return String(parseJwt(token).sub || ""); } catch { return ""; }
+}
+function clearSessionCache() {
+  for (let i = sessionStorage.length - 1; i >= 0; i--) {
+    const key = sessionStorage.key(i);
+    if (key && key.startsWith(SESSION_CACHE_PREFIX)) sessionStorage.removeItem(key);
+  }
+}
 const nativeFetch = window.fetch.bind(window);
 window.fetch = async (input, init = {}) => {
   const url = typeof input === "string" ? input : input instanceof Request ? input.url : String(input);
   const target = new URL(url, window.location.href);
   const headers = new Headers(init.headers || (input instanceof Request ? input.headers : undefined));
-  if (target.origin === window.location.origin && headers.has("Authorization") &&
+  const local = target.origin === window.location.origin;
+  const method = (init.method || (input instanceof Request ? input.method : "GET")).toUpperCase();
+  if (local && headers.has("Authorization") &&
       !["/refresh", "/exchange", "/logout"].includes(target.pathname)) {
     const token = await ensureFreshToken();
     headers.set("Authorization", "Bearer " + token);
     init = { ...init, headers };
   }
-  return nativeFetch(input, init);
+  // Cache only successful, authenticated, read-only responses for this EVE character.
+  // Never cache authorization errors, mutations, or application review lists.
+  const identity = local && headers.has("Authorization") ? sessionCacheIdentity(headers.get("Authorization").replace(/^Bearer\\s+/i, "")) : "";
+  const ttl = CACHE_TTL[target.pathname] || 0;
+  const cacheKey = identity && method === "GET" && ttl ? SESSION_CACHE_PREFIX + identity + ":" + target.pathname + target.search : "";
+  if (cacheKey) {
+    try {
+      const entry = JSON.parse(sessionStorage.getItem(cacheKey) || "null");
+      if (entry && entry.expires > Date.now())
+        return new Response(entry.body, { status: 200, headers: { "Content-Type": "application/json" } });
+    } catch {}
+  }
+  if (local && method !== "GET" && !["/refresh", "/exchange"].includes(target.pathname)) clearSessionCache();
+  const response = await nativeFetch(input, init);
+  if (cacheKey && response.ok) {
+    try {
+      const body = await response.clone().text();
+      sessionStorage.setItem(cacheKey, JSON.stringify({ expires: Date.now() + ttl, body }));
+    } catch {}
+  }
+  return response;
 };
 const SESSION_SCOPES_KEY = "eve_authorized_scopes";
 async function refreshSession() {
@@ -700,6 +733,7 @@ document.getElementById("logout-link").addEventListener("click", async (e) => {
   if (declinedSummaryPoll) clearInterval(declinedSummaryPoll);
   sessionStorage.removeItem("access_token");
   sessionStorage.removeItem("pkce_verifier");
+  clearSessionCache();
   await fetch("/logout", { method: "POST", credentials: "same-origin" }).catch(() => {});
   window.location.href = "/";
 });
@@ -885,7 +919,7 @@ function updateDeclinedSummaryPolling() {
   declinedSummaryPoll = null;
   if (currentListStatus !== "declined" || document.getElementById("leaders").style.display === "none") return;
   declinedSummaryPoll = setInterval(async () => {
-    if (document.hidden || currentListStatus !== "declined") return;
+    if (document.hidden || currentListStatus !== "declined" || document.getElementById("leaders").style.display === "none") return;
     try {
       const response = await fetch("/applications?status=declined", {
         headers: { Authorization: "Bearer " + currentToken }
