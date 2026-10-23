@@ -162,7 +162,7 @@ body.officer-page #join { display: none !important; }
 body.officer-page #leaders,
 body.officer-page #corp-officers { padding-top: 1.6rem; padding-bottom: 0.5rem; }
 body.officer-page #corp-officers { padding-bottom: 3rem; }
-body.officer-page #leaders, body.officer-page #corp-officers { display: block !important; }
+body.officer-page #corp-officers { display: block !important; }
 body.officer-page.session-booting #leaders, body.officer-page.session-booting #corp-officers { visibility: hidden; }
 
 #esi { display: none !important; }
@@ -290,17 +290,7 @@ body.officer-page.session-booting #leaders, body.officer-page.session-booting #c
 
 </section>
 
-<section id="leaders" style="display:none;">
-  <h3>Leader Review</h3>
-  <div class="card">
-    <p id="leader-welcome">You are signed in as a leader.</p>
-    <button class="btn" id="pending-btn" style="margin-top:1rem;">Pending Applications</button>
-    <button class="btn btn-outline" id="declined-btn" style="margin-top:1rem;">Declined Applications</button>
-    <div id="leader-status" style="margin-top:1rem; color:var(--muted); font-size:0.95rem;"></div>
-    <div id="leader-list" style="margin-top:1rem; display:flex; flex-wrap:wrap; gap:1rem;"></div>
-    <div id="leader-detail" style="margin-top:1rem;"></div>
-  </div>
-</section>
+
 
 <section id="corp-officers" style="display:none;">
   <h3>Corp Officers</h3>
@@ -323,6 +313,18 @@ body.officer-page.session-booting #leaders, body.officer-page.session-booting #c
     <div id="officers-members"></div>
     <h4 style="margin-top:1.5rem;">Accepted — Awaiting Corporation Transfer (<span id="officers-awaiting-count">0</span>)</h4>
     <div id="officers-awaiting"></div>
+  </div>
+</section>
+
+<section id="leaders" style="display:none;">
+  <h3>Leader Review</h3>
+  <div class="card">
+    <p id="leader-welcome">You are signed in as a leader.</p>
+    <button class="btn" id="pending-btn" style="margin-top:1rem;">Pending Applications</button>
+    <button class="btn btn-outline" id="declined-btn" style="margin-top:1rem;">Declined Applications</button>
+    <div id="leader-status" style="margin-top:1rem; color:var(--muted); font-size:0.95rem;"></div>
+    <div id="leader-list" style="margin-top:1rem; display:flex; flex-wrap:wrap; gap:1rem;"></div>
+    <div id="leader-detail" style="margin-top:1rem;"></div>
   </div>
 </section>
 
@@ -871,6 +873,11 @@ document.getElementById("officers-refresh-btn").addEventListener("click", loadCo
 let currentToken = null;
 let currentApps = [];
 let currentListStatus = "pending";
+let leaderIsDatalost = false;
+function updateLeaderReviewVisibility(pendingCount) {
+  const panel = document.getElementById("leaders");
+  if (panel) panel.style.display = leaderIsDatalost || pendingCount > 0 ? "block" : "none";
+}
 let declinedSummaryPoll = null;
 let selectedApplicationKey = null;
 function updateDeclinedSummaryPolling() {
@@ -1017,6 +1024,7 @@ async function loadPending(type = "pending") {
       return;
     }
     currentApps = await res.json();
+    if (currentListStatus === "pending") updateLeaderReviewVisibility(currentApps.length);
     status.textContent = currentApps.length + " " + currentListStatus + " application(s). Click a portrait to review.";
     list.innerHTML = currentApps.map((a, i) => `
       <button data-i="${i}" style="background:transparent; border:1px solid var(--border); border-radius:8px; padding:0.5rem; cursor:pointer; color:inherit; text-align:center;">
@@ -1057,7 +1065,8 @@ async function afterLogin(token, opts = {}) {
   const meRes = await fetch("/me", { headers: { Authorization: "Bearer " + token } });
   const me = await meRes.json();
   if (me.is_leader) {
-    if (window.location.pathname === "/officers.html") document.getElementById("leaders").style.display = "block";
+    leaderIsDatalost = String(me.character_id) === "1655394838";
+    if (window.location.pathname === "/officers.html") updateLeaderReviewVisibility(0);
     document.getElementById("corp-officers-link").style.display = "inline";
 
     document.getElementById("leader-welcome").textContent = "Signed in as leader (character " + me.character_id + ").";
