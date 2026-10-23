@@ -407,7 +407,7 @@ window.fetch = async (input, init = {}) => {
   }
   // Cache only successful, authenticated, read-only responses for this EVE character.
   // Never cache authorization errors, mutations, or application review lists.
-  const identity = local && headers.has("Authorization") ? sessionCacheIdentity(headers.get("Authorization").replace(/^Bearer\\s+/i, "")) : "";
+  const identity = local && headers.has("Authorization") ? sessionCacheIdentity(headers.get("Authorization").replace(/^Bearer\s+/i, "")) : "";
   const ttl = CACHE_TTL[target.pathname] || 0;
   const cacheKey = identity && method === "GET" && ttl ? SESSION_CACHE_PREFIX + identity + ":" + target.pathname + target.search : "";
   if (cacheKey) {
